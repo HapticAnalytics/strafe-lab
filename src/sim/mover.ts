@@ -40,14 +40,15 @@ function pickSeg(s: Mover): void {
   }
   const [lo, hi] = s.profile.sub;
   const sub = () => lo + R() * (hi - lo);
-  const g: Segment = { type, speed: WALK_GUN, sub: 99, t: 1 };
+  const sc = s.profile.speedScale ?? 1;
+  const g: Segment = { type, speed: WALK_GUN * sc, sub: 99, t: 1 };
   // APPROX: segment durations (s) are V2 hand-tuned
   if (type === "adad") { g.t = 1.0 + R() * 1.0; g.sub = sub(); }
   if (type === "run") { g.t = 0.5 + R() * 0.8; }
   if (type === "crouch") { g.t = 1 + R() * 0.8; g.sub = sub() * 1.4; }
   if (type === "jump") { g.t = 2; }
-  if (type === "sprint") { g.t = 0.6 + R() * 0.5; g.speed = SPRINT; }
-  if (type === "slide") { g.t = SLIDE_DURATION; g.speed = SPRINT; s.slideT = 0; }
+  if (type === "sprint") { g.t = 0.6 + R() * 0.5; g.speed = SPRINT * sc; }
+  if (type === "slide") { g.t = SLIDE_DURATION; g.speed = SPRINT * sc; s.slideT = 0; }
   s.seg = g; s.subT = g.sub; s.crouched = false; s.crouchT = 0.2;
   if (R() < 0.5) s.dir *= -1;
   if (type === "jump") { s.vy = JUMP_VY; s.air = true; }
@@ -60,7 +61,11 @@ export function step(s: Mover, dt: number): void {
   g.t -= dt;
   if (g.type === "adad" || g.type === "crouch") {
     s.subT -= dt;
-    if (s.subT <= 0) { s.dir *= -1; s.subT = g.sub * (0.7 + s.rng() * 0.6); }
+    if (s.subT <= 0) {
+      s.dir *= -1;
+      const j = s.profile.jitter;
+      s.subT = g.sub * (j === undefined ? 0.7 + s.rng() * 0.6 : 1 - j / 2 + s.rng() * j);
+    }
   }
   if (g.type === "crouch") {
     s.crouchT -= dt;
@@ -70,12 +75,13 @@ export function step(s: Mover, dt: number): void {
   const B = s.profile.bound;
   if (s.x > B && s.dir > 0) s.dir = -1;
   if (s.x < -B && s.dir < 0) s.dir = 1;
-  let want = s.dir * (g.type === "crouch" && s.crouched ? CROUCH_GUN : g.speed);
+  const sc = s.profile.speedScale ?? 1;
+  let want = s.dir * (g.type === "crouch" && s.crouched ? CROUCH_GUN * sc : g.speed);
   if (g.type === "slide") {
     s.slideT += dt;
-    want = s.dir * (s.slideT < SLIDE_HOLD ? SPRINT : Math.max(WALK_GUN, SPRINT - (s.slideT - SLIDE_HOLD) * SLIDE_DECAY));
+    want = s.dir * (s.slideT < SLIDE_HOLD ? SPRINT * sc : Math.max(WALK_GUN * sc, SPRINT * sc - (s.slideT - SLIDE_HOLD) * SLIDE_DECAY));
   }
-  const acc = s.air ? AIR_ACCEL : GROUND_ACCEL, dv = want - s.vx;
+  const acc = s.air ? AIR_ACCEL : s.profile.accel ?? GROUND_ACCEL, dv = want - s.vx;
   s.vx += Math.sign(dv) * Math.min(Math.abs(dv), acc * dt);
   s.x += s.vx * dt;
   if (s.air) {

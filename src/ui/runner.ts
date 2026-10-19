@@ -10,6 +10,10 @@ import { DRILLS } from "../sim/drills";
 import { DrillEvaluator } from "../sim/evaluator";
 import { MODES, planSweep, planZoom, seedFor, type Mode, type PlannedBlock, type Segment } from "../sim/protocol";
 import { batteryPlan } from "../sim/battery";
+import { nextLevel, paramsFor, type Levels, type NemesisParams } from "../sim/nemesis";
+import { TRAIN_ACC_S, TRAIN_SEG_S, trainingOrder, trainingSeed, type TrainMode } from "../sim/training";
+import { scoreNemesis } from "../analysis/training";
+import { mulberry32 } from "../core/rng";
 import { buildScenario, hitAt, targetView, type Scenario } from "../sim/scenario";
 import { BlockRecorder } from "../telemetry/recorder";
 import { SCHEMA_VERSION, type Settings, type SessionLog } from "../telemetry/schema";
@@ -49,6 +53,9 @@ export class Runner {
   private running = false;
   private k = 0;
   private zoomPlanned = false;
+  /** training: current Nemesis level per family (updated after every segment by the staircase) */
+  private levels: Levels | null = null;
+  private segParams: NemesisParams | null = null;
 
   constructor(private scene: RangeScene, private mouse: MouseInput, private hooks: RunnerHooks) {
     $("#ovGo").addEventListener("click", () => { if (!this.mouse.locked) this.mouse.lock(); else this.startBlock(); });
@@ -98,6 +105,28 @@ export class Runner {
     this.open(settings);
   }
 
+  /** Milestone 7 training: adaptive Nemesis segments at the player's own sens, fresh seeds, never battery seeds. */
+  startTraining(settings: Settings, mode: TrainMode, levels: Levels): void {
+    const cm = cmPer360(settings.sens, settings.dpi);
+    const rnd = () => crypto.getRandomValues(new Uint32Array(1))[0];
+    const order = trainingOrder(mode, mulberry32(rnd()));
+    this.plan = order.map((fams, b) => ({
+      cm, phase: "sweep" as const, warm: false,
+      acc: { id: "acc", seed: trainingSeed(rnd), dur: b === 0 ? TRAIN_ACC_S : 2 },
+      segments: fams.map(family => ({ id: "nem" as const, seed: trainingSeed(rnd), dur: TRAIN_SEG_S, family })),
+    }));
+    this.levels = { ...levels };
+    this.totalPlanned = this.plan.length;
+    this.zoomPlanned = true;
+    this.bi = 0;
+    this.session = {
+      schema: SCHEMA_VERSION, id: crypto.randomUUID(), startedAt: new Date().toISOString(), finishedAt: null,
+      status: "in_progress", settings, rawInput: false, sampling: "event", capture: this.mouse.diag,
+      protocol: "train", trainMode: mode, blocks: [],
+    };
+    this.open(settings);
+  }
+
   private open(settings: Settings): void {
     this.scene.setView(settings.fovScale, settings.display);
     $("#setup").hidden = true; $("#results").hidden = true; $("#baseline").hidden = true; $("#range").hidden = false;
@@ -112,10 +141,13 @@ export class Runner {
     const b = this.plan[this.bi];
     this.scene.hideEnemies(); $("#hpbars").hidden = true; $("#banner").hidden = true;
     const n = this.bi + 1;
-    const battery = this.session.protocol === "battery";
-    $("#ovEyebrow").textContent = battery ? `Baseline battery · round ${n} of ${this.totalPlanned} · your own sens` : b.warm ? "Warm-up · not scored" : `Block ${n} of ${this.totalPlanned} · ${b.phase === "zoom" ? "zoom" : "sweep"} · sensitivity hidden`;
-    $("#ovTitle").textContent = battery ? (n === 1 ? "Baseline battery" : "Round two") : b.warm ? "Get your hand moving" : b.phase === "zoom" ? "Zooming in" : "Next block";
-    $("#ovText").textContent = battery
+    const battery = this.session.protocol === "battery" || this.session.protocol === "train";
+    const train = this.session.protocol === "train";
+    $("#ovEyebrow").textContent = train ? `Training · block ${n} of ${this.totalPlanned} · ${this.session.trainMode} practice` : battery ? `Baseline battery · round ${n} of ${this.totalPlanned} · your own sens` : b.warm ? "Warm-up · not scored" : `Block ${n} of ${this.totalPlanned} · ${b.phase === "zoom" ? "zoom" : "sweep"} · sensitivity hidden`;
+    $("#ovTitle").textContent = train ? (n === 1 ? "Nemesis training" : "Next block") : battery ? (n === 1 ? "Baseline battery" : "Round two") : b.warm ? "Get your hand moving" : b.phase === "zoom" ? "Zooming in" : "Next block";
+    $("#ovText").textContent = train
+      ? "Scenarios adapt to keep you at about 55-75% success: they get harder when you do well and easier when you struggle. Fresh scenarios every time."
+      : battery
       ? "Same fixed drills as every battery, at your normal sens. Play it like a real fight; this measures your day-to-day noise floor."
       : b.warm
       ? "One short block at your current sens so your first scored block isn't cold. Same skills as the real test."
@@ -155,7 +187,7 @@ export class Runner {
     this.k = radPerCount(b.cm, this.session.settings.dpi);
     this.session.rawInput = this.mouse.rawInput;
     $("#overlay").hidden = true;
-    const round = b.warm || this.session.protocol === "battery" ? null : b.phase === "zoom" ? 2 : 1;
+    const round = b.warm || this.session.protocol === "battery" || this.session.protocol === "train" ? null : b.phase === "zoom" ? 2 : 1;
     this.B = { steps: [b.acc, ...b.segments], step: -1, inGap: false, t0: 0, gapUntil: 0, seg: null, sc: null, ev: null, rec: new BlockRecorder(this.bi, b.warm, round, b.cm) };
     this.live = true; this.phase = "live";
     this.nextStep(performance.now());
@@ -165,7 +197,9 @@ export class Runner {
     const B = this.B!;
     if (!B.ev) return;
     B.rec.events(this.mouse.drain());
-    B.rec.endDrill((now - B.t0) / 1000);
+    const stored = B.rec.endDrill((now - B.t0) / 1000);
+    // Nemesis staircase: the next segment of this family is harder/easier depending on this one's score
+    if (stored?.params && this.levels) this.levels[stored.params.family] = nextLevel(stored.params.level, scoreNemesis(stored));
     this.mouse.stop();
     B.ev = null; B.sc = null; B.seg = null;
   }
@@ -179,7 +213,8 @@ export class Runner {
     if (!B.inGap) {
       B.step++;
       if (B.step >= B.steps.length) return this.endBlock();
-      const d = DRILLS[B.steps[B.step].id];
+      const st = B.steps[B.step];
+    const d = st.family ? { name: `Nemesis · ${st.family}`, hint: DRILLS.nem.hint } : DRILLS[st.id];
       B.inGap = true; B.gapUntil = now + (B.step === 0 ? 700 : 900);
       $("#hudDrill").textContent = d.name; $("#hudHint").textContent = d.hint; $("#hudTimer").textContent = "";
       ban.hidden = false; ban.innerHTML = `${d.name}<small>${d.hint}</small>`;
@@ -189,9 +224,10 @@ export class Runner {
     ban.hidden = true;
     const seg = B.steps[B.step];
     B.seg = seg; B.t0 = now;
-    B.sc = buildScenario(seg.id, seg.seed, seg.dur);
+    this.segParams = seg.family && this.levels ? paramsFor(seg.family, this.levels[seg.family]) : null;
+    B.sc = buildScenario(seg.id, seg.seed, seg.dur, this.segParams ?? undefined);
     B.ev = new DrillEvaluator(B.sc, this.k, false);
-    B.rec.startDrill(seg.id, seg.seed, seg.dur, this.k);
+    B.rec.startDrill(seg.id, seg.seed, seg.dur, this.k, this.segParams ?? undefined);
     this.mouse.begin(now, this.k);
     if (B.sc.damage) { $("#hpbars").hidden = false; $("#hp0").style.width = "100%"; $("#hp1").style.width = "100%"; }
   }
@@ -220,7 +256,7 @@ export class Runner {
       for (let i = 0; i < sc.lanes.length; i++) {
         if (!ev.alive(i)) { this.scene.hide(i); continue; }
         const tv = targetView(sc, i, el);
-        this.scene.place(i, tv.feet, tv.h);
+        this.scene.place(i, tv.feet, tv.h, tv.size);
         const h = hitAt(tv, yaw, pitch);
         this.scene.highlight(i, !!h);
         if (h && !on) on = h;

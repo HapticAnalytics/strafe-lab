@@ -70,6 +70,12 @@
     <p class="note">Enemy movement uses Apex movement speeds (verified): about 4.4 m/s strafing with a gun out, 2 m/s crouch-walking, 7.6 m/s sprinting. Every block uses fresh random seeds so you can't memorise patterns, and the order of sensitivities is counterbalanced so warming up or tiring out doesn't bias the result.</p>
   </section>
 
+  <section class="panel" aria-labelledby="train-h">
+    <div class="row" style="justify-content:space-between"><h2 id="train-h" style="font-size:20px">Training</h2>
+      <div class="row"><select id="trainMode" style="width:auto"><option value="variable">Variable practice (mixed)</option><option value="blocked">Blocked practice (one at a time)</option></select><button class="btn" id="trainBtn" type="button">Start training</button></div></div>
+    <p class="note">About 6 minutes of Nemesis scenarios at your own sens. Difficulty adapts per scenario family to keep you at about 55–75% success, with fresh scenarios every time. Training never uses the baseline battery's scenarios, so the battery stays an honest test of transfer.</p>
+  </section>
+
   <section class="panel" aria-labelledby="dash-h">
     <div class="row" style="justify-content:space-between"><h2 id="dash-h" style="font-size:20px">Dashboard</h2><button class="btn" id="dashOpen" type="button">Open dashboard</button></div>
     <p class="note">Your Aim Fingerprint, sensitivity history, skill trends and records. Every number links back to the session it came from.</p>

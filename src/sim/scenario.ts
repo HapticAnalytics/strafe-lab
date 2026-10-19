@@ -6,8 +6,11 @@ import { angTo, enemyChest, type Vec3 } from "./geometry";
 import { buildTrajectories, sampleTrajectory, type EnemyState, type Trajectory } from "./trajectory";
 import { BODY_RADIUS, DPS_BODY, DPS_HEAD, EYE, HP } from "./constants";
 import { BODY_HEIGHT, hitTest } from "./hit";
+import { profileOf, type NemesisParams } from "./nemesis";
 
-export interface Lane { theta: number; dist: number }
+
+/** size: hitbox width scale (Nemesis); 1 = the standard hitbox */
+export interface Lane { theta: number; dist: number; size?: number }
 
 export interface SpawnTarget extends Lane { traj: Trajectory | null }
 
@@ -25,8 +28,20 @@ export interface Scenario {
 
 const STILL: EnemyState = { x: 0, y: 0, h: 1 };
 
-export function buildScenario(id: DrillId, seed: number, dur: number): Scenario {
+export function buildScenario(id: DrillId, seed: number, dur: number, params?: NemesisParams): Scenario {
   const d = DRILLS[id];
+  if (id === "nem") {
+    if (!params) throw new Error("Nemesis scenario needs params");
+    const prof = profileOf(params);
+    if (params.targets === 2) {
+      // APPROX: two lanes either side of centre, the second a little further away (like the 2v1 drill)
+      const lanes = [{ theta: 22 * DEG, dist: params.dist * 0.85, size: params.size }, { theta: -28 * DEG, dist: params.dist * 1.15, size: params.size }];
+      const traj = buildTrajectories([{ profile: prof, x0: -1 }, { profile: prof, x0: 1 }], seed, dur);
+      return { id, seed, dur, lanes, traj, damage: { body: DPS_BODY, head: DPS_HEAD, hp: HP }, spawn: null };
+    }
+    const traj = buildTrajectories([{ profile: prof, x0: 0 }], seed, dur);
+    return { id, seed, dur, lanes: [{ theta: 0, dist: params.dist, size: params.size }], traj, damage: null, spawn: null };
+  }
   if (id === "duo") {
     const traj = buildTrajectories(DUO_ENEMIES.map(e => ({ profile: DUO_PROFILE, x0: e.x0 })), seed, dur);
     return { id, seed, dur, lanes: DUO_ENEMIES.map(e => ({ theta: e.theta, dist: e.dist })), traj, damage: { body: DPS_BODY, head: DPS_HEAD, hp: HP }, spawn: null };
@@ -67,7 +82,7 @@ export interface TargetView {
   yaw: number; pitch: number;
   /** angular half-width (rad) of the body column and half-height of the body */
   hw: number; vh: number;
-  feet: Vec3; h: number;
+  feet: Vec3; h: number; size: number;
 }
 
 export function targetView(sc: Scenario, i: number, t: number): TargetView {
@@ -75,7 +90,8 @@ export function targetView(sc: Scenario, i: number, t: number): TargetView {
   const c = enemyChest(s, lane.theta, lane.dist), a = angTo(c), feet = feetPos(lane, s);
   const dh = Math.hypot(c.x, c.z);
   const top = Math.atan2(feet.y + BODY_HEIGHT * s.h - EYE, dh), bottom = Math.atan2(feet.y - EYE, dh);
-  return { yaw: a.yaw, pitch: a.pitch, hw: Math.asin(Math.min(1, BODY_RADIUS / dh)), vh: (top - bottom) / 2, feet, h: s.h };
+  const size = lane.size ?? 1;
+  return { yaw: a.yaw, pitch: a.pitch, hw: Math.asin(Math.min(1, (BODY_RADIUS * size) / dh)), vh: (top - bottom) / 2, feet, h: s.h, size };
 }
 
-export const hitAt = (tv: TargetView, yaw: number, pitch: number) => hitTest(yaw, pitch, tv.feet, tv.h).kind;
+export const hitAt = (tv: TargetView, yaw: number, pitch: number) => hitTest(yaw, pitch, tv.feet, tv.h, tv.size).kind;

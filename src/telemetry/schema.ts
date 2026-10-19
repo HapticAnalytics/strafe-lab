@@ -53,6 +53,8 @@ export interface EventDrillLog {
   /** radians per count used for this drill */
   k: number;
   events: InputSample[];
+  /** Nemesis segments (Milestone 7): the generated scenario parameters, required to replay */
+  params?: import("../sim/nemesis").NemesisParams;
 }
 
 export type DrillLog = FrameDrillLog | EventDrillLog;
@@ -106,6 +108,8 @@ export interface SessionLog {
   protocol?: "v3" | "battery" | "train";
   /** battery: which fixed held-out seed set was used */
   seedSet?: number;
+  /** training (Milestone 7): practice order */
+  trainMode?: "variable" | "blocked";
   mode?: "quick" | "standard" | "deep";
   /** seeds every block/segment of the session (see sim/protocol.ts seedFor) */
   sessionSeed?: number;

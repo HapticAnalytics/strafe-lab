@@ -106,7 +106,7 @@ interface DrillView { frames: Frame[]; extra: DuoExtra | null; m1: M1Metrics | n
 export function viewDrill(d: DrillLog | undefined, dpi: number): DrillView {
   if (!d) return { frames: [], extra: null, m1: null, elapsed: 0 };
   if (!isEventLog(d)) return { frames: d.frames, extra: d.extra ?? null, m1: null, elapsed: d.extra?.elapsed || DRILLS.duo.dur };
-  const sc = buildScenario(d.id, d.seed, d.dur);
+  const sc = buildScenario(d.id, d.seed, d.dur, d.params);
   const ev = replay(sc, d.k, d.events, d.tEnd);
   const frames: Frame[] = ev.samples.map(s => ({ t: s.t, yaw: s.yaw, pitch: s.pitch, ty: s.ty, tp: s.tp, on: s.on, hw: s.hw, c: s.c }));
   const extra: DuoExtra | null = sc.damage ? { kills: ev.kills, dmgBody: ev.dmgBody, dmgHead: ev.dmgHead, elapsed: ev.endT, dealt: ev.dealt } : null;

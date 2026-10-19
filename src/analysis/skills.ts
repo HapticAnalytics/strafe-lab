@@ -38,7 +38,7 @@ export function scoreSkill(d: DrillLog, dpi: number): SkillResult | null {
   if (!isEventLog(d)) return null;
   const id = d.id as SkillId;
   if (!SKILLS.includes(id)) return null;
-  const sc = buildScenario(d.id, d.seed, d.dur);
+  const sc = buildScenario(d.id, d.seed, d.dur, d.params);
   const ev = replay(sc, d.k, d.events, d.tEnd);
   if (sc.spawn) {
     const tau = SPAWN_TAU[id as "turn" | "flick" | "click"];

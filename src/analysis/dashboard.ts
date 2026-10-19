@@ -7,6 +7,7 @@ import { batteryMetrics, batterySeries } from "./battery";
 import { fingerprint, type Finding } from "./fingerprint";
 import { computeResult } from "./result";
 import { computeV3 } from "./result3";
+import { trainedVsHeldOut, trainSessions, type HeldOutRow, type TrainedRow } from "./training";
 
 export interface Sourced { value: number; sources: string[] }
 
@@ -25,7 +26,9 @@ export interface DashboardData {
   findings: Finding[];
   fingerprintReady: boolean;
   baselineIds: string[];
-  counts: { sensTests: number; batteries: number; batteryDays: number; external: number };
+  counts: { sensTests: number; batteries: number; batteryDays: number; external: number; trainings: number };
+  /** Milestone 7: trained (Nemesis levels) and held-out (battery) progress, kept separate */
+  training: { trained: TrainedRow[]; heldOut: HeldOutRow[] };
 }
 
 export function buildDashboard(all: SessionLog[], ext: ExternalResult[]): DashboardData {
@@ -60,9 +63,11 @@ export function buildDashboard(all: SessionLog[], ext: ExternalResult[]): Dashbo
     const best = t.points.reduce((a, p) => ((t.higherIsBetter ? p.value > a.value : p.value < a.value) ? p : a), t.points[0]);
     return { key: t.key, label: t.label, unit: t.unit, best: { value: best.value, sources: [best.sessionId] }, at: best.at };
   });
+  const train = trainSessions(all);
   return {
     sens, trends, external, records, findings: fp.findings, fingerprintReady: fp.ready, baselineIds: fp.baselineIds,
-    counts: { sensTests: sens.length, batteries: bat.length, batteryDays: new Set(bat.map(s => dayOf(s.startedAt))).size, external: ext.length },
+    counts: { sensTests: sens.length, batteries: bat.length, batteryDays: new Set(bat.map(s => dayOf(s.startedAt))).size, external: ext.length, trainings: train.length },
+    training: trainedVsHeldOut(train, trends, fp.baselineIds),
   };
 }
 
@@ -74,5 +79,6 @@ export function citedIds(d: DashboardData): Set<string> {
   for (const r of d.records) r.best.sources.forEach(i => ids.add(i));
   for (const f of d.findings) for (const e of f.evidence) ids.add(e.sessionId);
   d.baselineIds.forEach(i => ids.add(i));
+  for (const r of [...d.training.trained, ...d.training.heldOut]) r.sources.forEach(i => ids.add(i));
   return ids;
 }

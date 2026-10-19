@@ -55,3 +55,36 @@ test("a full warm-up block logs raw events and is saved", async ({ page }) => {
   expect(saved.events).toBeGreaterThan(100);
   expect(errors).toEqual([]);
 });
+
+test("a training block runs Nemesis segments and is saved with their parameters", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto("/");
+  await page.click("#trainBtn");
+  await page.click("#ovGo");
+  await page.waitForTimeout(500);
+  test.skip(!(await page.evaluate(() => !!document.pointerLockElement)), "pointer lock not available");
+  await expect(page.locator("#ovEyebrow")).toContainText("Training · block 1 of 3");
+  await page.waitForTimeout(700);
+  await page.keyboard.press("Space");
+  let i = 0;
+  while (!(await page.locator("#overlay").isVisible())) {
+    await page.mouse.move(400 + 150 * Math.sin(i / 7), 300 + 40 * Math.cos(i / 11));
+    await page.waitForTimeout(10);
+    i++;
+  }
+  const saved = await page.evaluate(() => new Promise<{ protocol: string; segs: number; withParams: number }>(res => {
+    const req = indexedDB.open("strafe-lab");
+    req.onsuccess = () => {
+      const tx = req.result.transaction("sessions").objectStore("sessions").getAll();
+      tx.onsuccess = () => {
+        const s = tx.result[tx.result.length - 1];
+        const d = Object.values(s.blocks[0].drills as Record<string, { params?: unknown }>);
+        res({ protocol: s.protocol, segs: d.length, withParams: d.filter(x => x.params).length });
+      };
+    };
+  }));
+  expect(saved).toEqual({ protocol: "train", segs: 5, withParams: 5 });
+  expect(errors).toEqual([]);
+});

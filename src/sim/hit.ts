@@ -55,11 +55,11 @@ function raySphere(o: Vec3, d: Vec3, c: Vec3, r: number): number {
 export interface Hit { kind: 0 | 1 | 2; dist: number }
 
 /** feet: world position of the enemy's feet (lane position, y = jump height). h: stance scale. 1 = body, 2 = head. */
-export function hitTest(yaw: number, pitch: number, feet: Vec3, h: number): Hit {
+export function hitTest(yaw: number, pitch: number, feet: Vec3, h: number, size = 1): Hit {
   const o = { x: 0, y: EYE, z: 0 }, d = aimDir(yaw, pitch);
   const top = feet.y + BODY_HEIGHT * h;
-  const tb = rayCylinder(o, d, feet.x, feet.z, feet.y, top, BODY_RADIUS);
-  const th = raySphere(o, d, { x: feet.x, y: top + HEAD_OFFSET, z: feet.z }, HEAD_RADIUS);
+  const tb = rayCylinder(o, d, feet.x, feet.z, feet.y, top, BODY_RADIUS * size);
+  const th = raySphere(o, d, { x: feet.x, y: top + HEAD_OFFSET, z: feet.z }, HEAD_RADIUS * size);
   if (th === Infinity && tb === Infinity) return { kind: 0, dist: Infinity };
   return th <= tb ? { kind: 2, dist: th } : { kind: 1, dist: tb };
 }

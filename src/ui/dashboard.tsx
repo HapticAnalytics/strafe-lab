@@ -88,7 +88,7 @@ function Dashboard({ d, dpi, onExport, coach }: { d: DashboardData; dpi: number;
         <div className="fact"><span className="v">{d.counts.sensTests}</span><span className="k">Sens tests</span></div>
         <div className="fact"><span className="v">{d.counts.batteries}</span><span className="k">Batteries</span></div>
         <div className="fact"><span className="v">{d.counts.batteryDays}</span><span className="k">Battery days</span></div>
-        <div className="fact"><span className="v">{d.counts.external}</span><span className="k">External results</span></div>
+        <div className="fact"><span className="v">{d.counts.trainings}</span><span className="k">Trainings</span></div>
       </div>
       <Panel title="Aim Fingerprint" tag="vs your own baseline · no population norms">
         {!d.fingerprintReady ? <p className="note">The fingerprint needs a noise floor first: run the baseline battery on 3 separate days ({d.counts.batteryDays} so far).</p>
@@ -96,6 +96,17 @@ function Dashboard({ d, dpi, onExport, coach }: { d: DashboardData; dpi: number;
           : <p className="note">No finding exceeds your noise floor in two or more sessions. That means nothing stands out yet, not that nothing could be improved.</p>}
       </Panel>
       <CoachPanel {...coach} />
+      <Panel title="Training progress" tag="trained and held-out reported separately">
+        <h3 style={{ fontSize: 15 }}>Trained scenarios (Nemesis difficulty level, 0 = easy, 1 = hard)</h3>
+        {d.training.trained.length ? <div className="tablebox"><table><thead><tr><th>Family</th><th>Sessions</th><th>First level</th><th>Latest level</th><th>Change</th></tr></thead><tbody>
+          {d.training.trained.map(t => <tr key={t.family} title={src(t.sources)}><td>{t.label}</td><td>{t.sessions}</td><td>{fmt(t.firstLevel, 2)}</td><td>{fmt(t.lastLevel, 2)}</td><td>{fmt(t.change, 2)}</td></tr>)}
+        </tbody></table></div> : <p className="note">No training sessions yet.</p>}
+        <h3 style={{ fontSize: 15 }}>Held-out battery (fixed scenarios never trained), latest vs baseline</h3>
+        {d.training.heldOut.length ? <div className="tablebox"><table><thead><tr><th>Metric</th><th>Baseline</th><th>Latest</th><th>Change (× noise floor)</th></tr></thead><tbody>
+          {d.training.heldOut.map(h => <tr key={h.key} title={src(h.sources)}><td>{h.label}</td><td>{fmt(h.baseline, 1)}</td><td>{fmt(h.latest, 1)}</td><td>{fmt(h.changeFloors, 2)}{h.changeFloors != null && Math.abs(h.changeFloors) < 1 ? " (within noise)" : ""}</td></tr>)}
+        </tbody></table></div> : <p className="note">Needs a baseline (3 battery days) and at least one later battery.</p>}
+        <p className="note">Getting better at trained scenarios is expected. Only held-out changes beyond 1× noise floor suggest the skill transferred.</p>
+      </Panel>
       <Panel title="Sensitivity history"><SensHistory sens={d.sens} dpi={dpi} /></Panel>
       <Panel title="Skill trends" tag="battery scores · band = baseline mean ± SDC95">
         {skill.length ? <div className="grid2">{skill.map(t => <Trend key={t.key} t={t} />)}</div> : <p className="note">No battery sessions yet.</p>}

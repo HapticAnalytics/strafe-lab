@@ -16,7 +16,7 @@ export interface ReplayData {
 }
 
 export function loadReplay(log: EventDrillLog, dpi: number): ReplayData {
-  const sc = buildScenario(log.id, log.seed, log.dur);
+  const sc = buildScenario(log.id, log.seed, log.dur, log.params);
   const ev = replay(sc, log.k, log.events, log.tEnd);
   const m1 = sc.spawn ? null : analyzeM1(ev.samples, dpi, ev.kills);
   return { log, sc, ev, samples: ev.samples, m1, duration: ev.samples.length ? ev.samples[ev.samples.length - 1].t : 0 };

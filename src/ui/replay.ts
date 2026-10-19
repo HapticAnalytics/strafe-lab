@@ -35,7 +35,7 @@ export function setupReplay(onBack: () => void): { open(s: SessionLog): void } {
     const b = session!.blocks[+$<HTMLSelectElement>("#rpBlock").value];
     const sel = $<HTMLSelectElement>("#rpDrill");
     sel.innerHTML = "";
-    for (const [id, d] of Object.entries(b.drills)) if (d && isEventLog(d)) sel.add(new Option(DRILLS[d.id].name, id));
+    for (const [id, d] of Object.entries(b.drills)) if (d && isEventLog(d)) sel.add(new Option(d.params ? `Nemesis · ${d.params.family} · level ${d.params.level.toFixed(2)}` : DRILLS[d.id].name, id));
     load();
   }
   function load(): void {
@@ -57,7 +57,7 @@ export function setupReplay(onBack: () => void): { open(s: SessionLog): void } {
     if (!r) return;
     const f = frameAt(r, t);
     sc.hideEnemies();
-    f.targets.forEach((x, j) => { const slot = Math.min(1, j); sc.place(slot, x.tv.feet, x.tv.h); sc.highlight(slot, x.on); });
+    f.targets.forEach((x, j) => { const slot = Math.min(1, j); sc.place(slot, x.tv.feet, x.tv.h, x.tv.size); sc.highlight(slot, x.on); });
     sc.render(f.aim.yaw, f.aim.pitch);
     // trails: crosshair direction and target chests over the last TRAIL_S seconds, projected into today's view
     const tc = $<HTMLCanvasElement>("#rpTrails"), ctx = tc.getContext("2d")!;

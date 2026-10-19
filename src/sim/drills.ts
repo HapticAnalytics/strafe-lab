@@ -1,7 +1,7 @@
 import { DEG } from "../core/units";
 
 /** V2 drills (pb, close, mid, duo, acc) plus the Milestone 2 skill drills. */
-export type DrillId = "pb" | "close" | "mid" | "duo" | "acc" | "vert" | "long" | "turn" | "flick" | "click";
+export type DrillId = "pb" | "close" | "mid" | "duo" | "acc" | "vert" | "long" | "turn" | "flick" | "click" | "nem";
 export type SegType = "adad" | "run" | "crouch" | "jump" | "sprint" | "slide";
 export type Mix = Partial<Record<SegType, number>>;
 
@@ -11,6 +11,12 @@ export interface MoveProfile {
   sub: [number, number];
   /** max lateral offset from centre, metres */
   bound: number;
+  /** Nemesis (Milestone 7) overrides; absent = the V2 values. speedScale multiplies all Apex speeds. */
+  speedScale?: number;
+  /** ground acceleration, m/s^2 */
+  accel?: number;
+  /** reversal-timing randomness: each reversal interval is sub x (1 - j/2 + U[0,1) x j) */
+  jitter?: number;
 }
 
 /**
@@ -51,6 +57,8 @@ export const DRILLS: Record<DrillId, DrillDef> = {
   turn:  { name: "180 turns", hint: "Someone behind you. Turn, get on them, hold.", dur: 10, seed: 808, spawn: { complete: "hold", holdMs: 250, timeout: 2.5, delay: 0.45, minDeg: 140, maxDeg: 180, dist: [6, 12], move: null } },
   flick: { name: "Shotgun flick", hint: "Close target pops up. Flick, correct, hold.", dur: 10, seed: 909, spawn: { complete: "hold", holdMs: 150, timeout: 1.5, delay: 0.4, minDeg: 20, maxDeg: 90, dist: [3, 6], move: { mix: { adad: .7, run: .3 }, sub: [.2, .4], bound: 1.5 } } },
   click: { name: "Dynamic clicking", hint: "Moving targets. Click once when you are on them. Misses count.", dur: 10, seed: 1010, spawn: { complete: "click", holdMs: 0, timeout: 2.0, delay: 0.4, minDeg: 10, maxDeg: 45, dist: [10, 20], move: { mix: { adad: .5, run: .5 }, sub: [.3, .6], bound: 3 } } },
+  // Milestone 7: parameters come from sim/nemesis.ts per segment (stored in the log); this entry is only for naming.
+  nem:   { name: "Nemesis", hint: "Adaptive training scenario. It gets harder when you do well.", dur: 20, seed: 0 },
   acc:   { name: "Adjusting", hint: "Not scored. Get used to this sensitivity.", dist: 8, bound: 4.5, dur: 4, seed: 505, mix: { adad: .4, run: .3, crouch: .15, jump: .15 }, sub: [.2, .5] },
 };
 

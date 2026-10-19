@@ -20,6 +20,8 @@ import { listExternal, listExperiments, saveExperiment } from "./storage/db";
 import { evaluateExperiment, sensLocked } from "./analysis/experiments";
 import { batterySessions } from "./analysis/baseline";
 import { buildContext } from "./coach/facts";
+import { levelsFrom, trainSessions } from "./analysis/training";
+import type { TrainMode } from "./sim/training";
 import { batteryMetrics } from "./analysis/battery";
 import { computeV3, type V3Result } from "./analysis/result3";
 import { resultsV3HTML } from "./ui/results3";
@@ -72,6 +74,7 @@ function v3Of(s: SessionLog): V3Result {
 function summary(s: SessionLog): string | null {
   if (s.status !== "complete") return null;
   if (s.protocol === "battery") return `battery combined ${fmt(batteryMetrics(s)[0]?.value, 1)}`;
+  if (s.protocol === "train") return `${s.trainMode} training`;
   if (s.protocol === "v3") {
     const r = v3Of(s);
     if (!r.overall || !r.rec) return null;
@@ -90,7 +93,7 @@ async function refreshHistory(): Promise<SessionLog[]> {
   $("#histList").innerHTML = all.length
     ? [...all].reverse().map(s => {
         const res = summary(s);
-        const label = `${new Date(s.startedAt).toLocaleString()} · ${s.protocol === "v3" ? MODES[s.mode ?? "standard"].label : s.protocol === "battery" ? "Baseline battery" : "classic"} · ${s.status.replace("_", " ")} · ${s.blocks.length} blocks`;
+        const label = `${new Date(s.startedAt).toLocaleString()} · ${s.protocol === "v3" ? MODES[s.mode ?? "standard"].label : s.protocol === "battery" ? "Baseline battery" : s.protocol === "train" ? "Training" : "classic"} · ${s.status.replace("_", " ")} · ${s.blocks.length} blocks`;
         const rp = s.sampling === "event" && s.blocks.length ? `<button class="btn ghost" data-replay="${s.id}" type="button" style="padding:6px 12px">Replay</button>` : "";
         return `<li style="grid-template-columns:1fr auto"><span>${label}${res ? ` · ${res}` : ""}</span><span class="row" style="gap:6px">${res ? `<button class="btn ghost" data-open="${s.id}" type="button" style="padding:6px 12px">Open</button>` : ""}${rp}</span></li>`;
       }).join("")
@@ -103,6 +106,7 @@ async function refreshHistory(): Promise<SessionLog[]> {
 function showResults(s: SessionLog, all: SessionLog[]): void {
   const box = $("#results");
   if (s.protocol === "battery") { baseline.open(); return; }
+  if (s.protocol === "train") { openDashboard(); return; }
   if (s.protocol === "v3") {
     box.innerHTML = resultsV3HTML(s, v3Of(s));
     $("#setup").hidden = true; box.hidden = false; scrollTo(0, 0);
@@ -129,7 +133,9 @@ function ensureRunner(): Runner {
       persist: s => { saveSession(db, s).catch(err => console.error("save failed", err)); },
       finished: async s => {
         const all = await refreshHistory();
-        if (s.protocol === "battery") await baseline.open(); else showResults(s, all);
+        if (s.protocol === "battery") await baseline.open();
+        else if (s.protocol === "train") await openDashboard();
+        else showResults(s, all);
       },
       quit: () => { refreshHistory(); },
     });
@@ -178,6 +184,12 @@ async function openDashboard(): Promise<void> {
   renderDashboard($("#dashRoot"), d, readSettings().dpi, () => { exportJson(); }, { d, ctx, experiments: results, saveExperiment: e => saveExperiment(db, e), refresh: () => { openDashboard(); } });
 }
 $("#dashOpen").addEventListener("click", () => { scrollTo(0, 0); openDashboard(); });
+$("#trainBtn").addEventListener("click", async () => {
+  const settings = readSettings();
+  saveSettings(db, settings).catch(() => {});
+  const levels = levelsFrom(trainSessions(await listSessions(db)));
+  ensureRunner().startTraining(settings, $<HTMLSelectElement>("#trainMode").value as TrainMode, levels);
+});
 $("#dashBack").addEventListener("click", () => { $("#dashboard").hidden = true; $("#setup").hidden = false; });
 $("#exportBtn").addEventListener("click", async () => {
   const data = await exportAll(db);

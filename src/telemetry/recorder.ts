@@ -10,8 +10,8 @@ export class BlockRecorder {
     this.log = { index, warm, round, cm360, drills: {} };
   }
 
-  startDrill(id: DrillId, seed: number, dur: number, k: number): void {
-    this.cur = { id, seed, dur, tEnd: dur, k, events: [] };
+  startDrill(id: DrillId, seed: number, dur: number, k: number, params?: import("../sim/nemesis").NemesisParams): void {
+    this.cur = { id, seed, dur, tEnd: dur, k, events: [], ...(params ? { params } : {}) };
   }
 
   /** Stores copies with -0 normalised to 0 (JSON cannot represent -0, and exports must round-trip exactly). */
@@ -21,8 +21,17 @@ export class BlockRecorder {
   }
 
   /** The warm-up adjustment drill ("acc") is not stored. */
-  endDrill(tEnd: number): void {
-    if (this.cur && this.cur.id !== "acc") { this.cur.tEnd = tEnd + 0; this.log.drills[this.cur.id] = this.cur; }
+  /** Returns the stored log (null for the unstored acclimation drill). */
+  endDrill(tEnd: number): EventDrillLog | null {
+    const done = this.cur && this.cur.id !== "acc" ? this.cur : null;
+    if (this.cur && this.cur.id !== "acc") {
+      this.cur.tEnd = tEnd + 0;
+      // Nemesis blocks hold many segments: key them nem, nem1, nem2, ... (DrillLog.id stays "nem")
+      let key = this.cur.id as string;
+      for (let i = 1; key in this.log.drills; i++) key = `${this.cur.id}${i}`;
+      (this.log.drills as Record<string, EventDrillLog>)[key] = this.cur;
+    }
     this.cur = null;
+    return done;
   }
 }

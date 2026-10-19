@@ -84,8 +84,9 @@ export class RangeScene {
   hide(i: number): void { this.enemies[i].visible = false; }
 
   /** Draw enemy i with its feet at `feet` and stance scale h (both straight from the sim). */
-  place(i: number, feet: Vec3, h: number): void {
+  place(i: number, feet: Vec3, h: number, size = 1): void {
     const e = this.enemies[i], { body, head } = e.userData;
+    body.scale.x = body.scale.z = size; head.scale.setScalar(size);
     e.position.set(feet.x, feet.y, feet.z);
     body.scale.y = h; body.position.y = (BODY_HEIGHT / 2) * h; head.position.y = BODY_HEIGHT * h + HEAD_OFFSET;
     e.lookAt(0, feet.y, 0);

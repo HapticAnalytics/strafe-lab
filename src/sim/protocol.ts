@@ -41,7 +41,8 @@ export const CM_MAX = 100;
 // APPROX: gap between segments (banner), seconds; used for duration estimates only
 export const GAP_S = 0.8;
 
-export interface Segment { id: DrillId; seed: number; dur: number }
+/** family: Nemesis segments only; their parameters are generated from the current level when the segment starts */
+export interface Segment { id: DrillId; seed: number; dur: number; family?: import("./nemesis").Family }
 export interface PlannedBlock { cm: number; phase: "sweep" | "zoom"; acc: Segment; segments: Segment[] }
 
 /** Deterministic 32-bit seed for (session, block, slot). */
