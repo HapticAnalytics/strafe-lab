@@ -1,12 +1,11 @@
-// Rendering reads sim state and never changes it. The raycast here only reports what the crosshair is over;
-// Milestone 1 replaces it with analytic per-event hit tests in sim/.
+// Rendering reads sim state and never changes it. No hit testing happens here (see sim/hit.ts).
 import * as THREE from "three";
 import { mulberry32 } from "../core/rng";
 import { layoutFor, type Display } from "../core/display";
-import { DEG, hfov43FromScale, vfovFrom43 } from "../core/units";
-import { EYE } from "../sim/constants";
-import { type Mover } from "../sim/mover";
-import { enemyChest, type Vec3 } from "../sim/geometry";
+import { hfov43FromScale, vfovFrom43 } from "../core/units";
+import { BODY_RADIUS, EYE } from "../sim/constants";
+import type { Vec3 } from "../sim/geometry";
+import { BODY_HEIGHT, HEAD_OFFSET, HEAD_RADIUS } from "../sim/hit";
 
 interface EnemyObj extends THREE.Group {
   userData: { body: THREE.Mesh; head: THREE.Mesh; bodyMat: THREE.MeshLambertMaterial };
@@ -16,7 +15,6 @@ export class RangeScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(70, 1, 0.05, 300);
-  private raycaster = new THREE.Raycaster();
   private enemies: EnemyObj[];
   private fovScale = 1.4675;
   private display: Display = { aspect: null, scaling: "stretched" };
@@ -57,8 +55,8 @@ export class RangeScene {
     const bodyMat = new THREE.MeshLambertMaterial({ color, emissive: 0x2a0e04 });
     const headMat = new THREE.MeshLambertMaterial({ color: 0xffd2b8, emissive: 0x2a0e04 });
     const g = new THREE.Group() as EnemyObj;
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.3, 1.45, 16), bodyMat);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), headMat);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(BODY_RADIUS, BODY_RADIUS, BODY_HEIGHT, 24), bodyMat);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(HEAD_RADIUS, 20, 14), headMat);
     g.add(body, head);
     g.userData = { body, head, bodyMat };
     g.visible = false;
@@ -83,29 +81,13 @@ export class RangeScene {
   hideEnemies(): void { this.enemies.forEach(e => (e.visible = false)); }
   hide(i: number): void { this.enemies[i].visible = false; }
 
-  place(i: number, m: Mover, theta: number, dist: number): Vec3 {
+  /** Draw enemy i with its feet at `feet` and stance scale h (both straight from the sim). */
+  place(i: number, feet: Vec3, h: number): void {
     const e = this.enemies[i], { body, head } = e.userData;
-    const c = enemyChest(m, theta, dist);
-    const fx = -Math.sin(theta), fz = -Math.cos(theta), rx = Math.cos(theta), rz = -Math.sin(theta);
-    e.position.set(fx * dist + rx * m.x, m.y, fz * dist + rz * m.x);
-    body.scale.y = m.h; body.position.y = 0.725 * m.h; head.position.y = 1.45 * m.h + 0.16;
-    e.lookAt(0, m.y, 0);
+    e.position.set(feet.x, feet.y, feet.z);
+    body.scale.y = h; body.position.y = (BODY_HEIGHT / 2) * h; head.position.y = BODY_HEIGHT * h + HEAD_OFFSET;
+    e.lookAt(0, feet.y, 0);
     e.visible = true;
-    return c;
-  }
-
-  /** What the crosshair is over, for the given enemy indices. */
-  aim(yaw: number, pitch: number, which: number[]): { index: number; head: boolean } | null {
-    this.camera.rotation.set(pitch, yaw, 0);
-    this.scene.updateMatrixWorld();
-    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
-    const objs: THREE.Object3D[] = [];
-    which.forEach(i => { const e = this.enemies[i]; if (e.visible) objs.push(e.userData.body, e.userData.head); });
-    const hit = this.raycaster.intersectObjects(objs, false);
-    if (!hit.length) return null;
-    const o = hit[0].object;
-    const index = which.find(i => this.enemies[i].userData.body === o || this.enemies[i].userData.head === o)!;
-    return { index, head: o === this.enemies[index].userData.head };
   }
 
   highlight(i: number, on: boolean): void { this.enemies[i].userData.bodyMat.emissive.setHex(on ? 0x6a2508 : 0x2a0e04); }
@@ -116,4 +98,3 @@ export class RangeScene {
   }
 }
 
-export { DEG };

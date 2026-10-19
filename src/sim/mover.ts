@@ -53,7 +53,8 @@ function pickSeg(s: Mover): void {
   if (type === "jump") { s.vy = JUMP_VY; s.air = true; }
 }
 
-function step(s: Mover, dt: number): void {
+/** One fixed simulation step. Exported for lockstep multi-enemy trajectories. */
+export function step(s: Mover, dt: number): void {
   if (s.seg.t <= 0 && !s.air) pickSeg(s);
   const g = s.seg;
   g.t -= dt;

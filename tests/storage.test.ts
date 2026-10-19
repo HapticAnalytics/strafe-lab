@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { exportAll, getSettings, importAll, listSessions, makeDb, parseExport, saveSession, saveSettings } from "../src/storage/db";
-import { sessionProblem } from "../src/telemetry/schema";
+import { sessionProblem, type FrameDrillLog } from "../src/telemetry/schema";
 import { synthSession } from "./helpers";
 
 let n = 0;
@@ -60,7 +60,7 @@ describe("storage", () => {
   it("sessionProblem accepts a valid session and rejects broken frames", () => {
     expect(sessionProblem(synthSession())).toBeNull();
     const s = synthSession();
-    (s.blocks[0].drills.pb!.frames[0] as unknown as { t: string }).t = "0";
+    ((s.blocks[0].drills.pb as FrameDrillLog).frames[0] as unknown as { t: string }).t = "0";
     expect(sessionProblem(s)).toBe("bad frame");
   });
 });

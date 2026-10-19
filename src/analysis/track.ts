@@ -2,7 +2,10 @@ import { clamp, mean, wrap } from "../core/math";
 import { DEG } from "../core/units";
 import { DPS_BODY } from "../sim/constants";
 import { DRILLS } from "../sim/drills";
-import type { BlockLog, DrillLog, Frame } from "../telemetry/schema";
+import { buildScenario } from "../sim/scenario";
+import { replay } from "../sim/evaluator";
+import { isEventLog, type BlockLog, type DrillLog, type DuoExtra, type Frame } from "../telemetry/schema";
+import { computeM1, type M1Metrics } from "./metrics";
 import {
   JITTER_HALF_WINDOW, MAX_FRAME_GAP, MOVING_THRESHOLD, NEAR_DEG, OSC_HALFWIDTHS, PEAK_MIN_DT, PEAK_WINDOW,
   RECOVER_GRACE, RECOVER_LOOKBACK, RECOVER_UNRECOVERED_MS, RECOVER_WINDOW, SCORE_WEIGHTS,
@@ -20,6 +23,8 @@ export interface DuoMetrics extends TrackMetrics {
 export interface BlockMetrics {
   pb: TrackMetrics; close: TrackMetrics; mid: TrackMetrics; duo: DuoMetrics;
   score: number; order: number;
+  /** Milestone 1 metrics; null for v1 (per-frame) sessions */
+  m1: Record<"pb" | "close" | "mid" | "duo", M1Metrics> | null;
 }
 
 /** Pure function of the logged frames. Percent metrics are time-weighted. */
@@ -91,19 +96,35 @@ export function analyzeTrack(fr: Frame[], dpi: number): TrackMetrics {
   };
 }
 
-const framesOf = (d: DrillLog | undefined): Frame[] => d?.frames ?? [];
+export type RangeId = "pb" | "close" | "mid" | "duo";
+export const RANGE_IDS: RangeId[] = ["pb", "close", "mid", "duo"];
+
+/** Everything derived from one drill log. v1 (frames) logs have no M1 metrics. */
+interface DrillView { frames: Frame[]; extra: DuoExtra | null; m1: M1Metrics | null; elapsed: number }
+
+/** Replay an event log through the shared evaluator; frames for the V2 metrics come from the 1 kHz samples. */
+export function viewDrill(d: DrillLog | undefined, dpi: number): DrillView {
+  if (!d) return { frames: [], extra: null, m1: null, elapsed: 0 };
+  if (!isEventLog(d)) return { frames: d.frames, extra: d.extra ?? null, m1: null, elapsed: d.extra?.elapsed || DRILLS.duo.dur };
+  const sc = buildScenario(d.id, d.seed, d.dur);
+  const ev = replay(sc, d.k, d.events, d.tEnd);
+  const frames: Frame[] = ev.samples.map(s => ({ t: s.t, yaw: s.yaw, pitch: s.pitch, ty: s.ty, tp: s.tp, on: s.on, hw: s.hw, c: s.c }));
+  const extra: DuoExtra | null = sc.damage ? { kills: ev.kills, dmgBody: ev.dmgBody, dmgHead: ev.dmgHead, elapsed: ev.endT, dealt: ev.dealt } : null;
+  return { frames, extra, m1: computeM1(ev.samples, dpi, ev.kills), elapsed: ev.endT };
+}
 
 /** Reads only the block's log (never rendered state). */
 export function analyzeBlock(b: BlockLog, dpi: number): BlockMetrics {
-  const d = b.drills;
-  const pb = analyzeTrack(framesOf(d.pb), dpi), close = analyzeTrack(framesOf(d.close), dpi), mid = analyzeTrack(framesOf(d.mid), dpi);
-  const base = analyzeTrack(framesOf(d.duo), dpi);
-  const x = d.duo?.extra;
-  const elapsed = x?.elapsed || DRILLS.duo.dur, dealt = x?.dealt || 0, k = x?.kills ?? [];
+  const v = Object.fromEntries(RANGE_IDS.map(id => [id, viewDrill(b.drills[id], dpi)])) as Record<RangeId, DrillView>;
+  const pb = analyzeTrack(v.pb.frames, dpi), close = analyzeTrack(v.close.frames, dpi), mid = analyzeTrack(v.mid.frames, dpi);
+  const base = analyzeTrack(v.duo.frames, dpi);
+  const x = v.duo.extra;
+  const elapsed = v.duo.elapsed || DRILLS.duo.dur, dealt = x?.dealt || 0, k = x?.kills ?? [];
   const dmgTotal = (x?.dmgBody ?? 0) + (x?.dmgHead ?? 0);
   let switchMs: number | null = null;
-  if (k.length) {
-    const fr = framesOf(d.duo), t0 = fr.length ? fr[0].t + k[0].t : 0;
+  if (v.duo.m1) switchMs = v.duo.m1.switchMs;
+  else if (k.length) {
+    const fr = v.duo.frames, t0 = fr.length ? fr[0].t + k[0].t : 0;
     const back = fr.find(f => f.t > t0 + 0.02 && f.on);
     switchMs = back ? (back.t - t0) * 1000 : null;
   }
@@ -118,5 +139,6 @@ export function analyzeBlock(b: BlockLog, dpi: number): BlockMetrics {
     score: clamp((dealt / (DPS_BODY * elapsed)) * 100, 0, 100),
   };
   const score = SCORE_WEIGHTS.pb * pb.on + SCORE_WEIGHTS.close * close.on + SCORE_WEIGHTS.mid * mid.on + SCORE_WEIGHTS.duo * duo.score;
-  return { pb, close, mid, duo, score, order: b.index };
+  const m1 = v.pb.m1 ? { pb: v.pb.m1, close: v.close.m1!, mid: v.mid.m1!, duo: v.duo.m1! } : null;
+  return { pb, close, mid, duo, score, order: b.index, m1 };
 }

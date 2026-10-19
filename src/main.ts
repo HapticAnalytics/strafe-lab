@@ -4,7 +4,7 @@ import { setupCoach } from "./coach/coach";
 import { clamp, fmt } from "./core/math";
 import { ASPECT_PRESETS, type Scaling } from "./core/display";
 import { cmPer360, hfov43FromScale, hfovForAspect, sliderFromFovScale } from "./core/units";
-import { MouseView } from "./input/pointer";
+import { MouseInput } from "./input/pointer";
 import { RangeScene } from "./render/scene";
 import { exportAll, getSettings, importAll, listSessions, makeDb, saveSession, saveSettings } from "./storage/db";
 import type { Settings, SessionLog } from "./telemetry/schema";
@@ -42,7 +42,7 @@ function updateCalc(): void {
 const finePointer = matchMedia("(pointer: fine)").matches && "requestPointerLock" in Element.prototype;
 if (!finePointer) { $("#noMouse").hidden = false; $<HTMLButtonElement>("#startBtn").disabled = true; }
 
-const mouse = new MouseView($<HTMLCanvasElement>("#view"));
+const mouse = new MouseInput($<HTMLCanvasElement>("#view"));
 let scene: RangeScene | null = null;
 let runner: Runner | null = null;
 

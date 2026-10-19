@@ -2,10 +2,10 @@ import { mulberry32 } from "../src/core/rng";
 import { DRILLS } from "../src/sim/drills";
 import { angTo, enemyChest } from "../src/sim/geometry";
 import { advanceMover, createMover } from "../src/sim/mover";
-import type { BlockLog, DrillLog, Frame, SessionLog } from "../src/telemetry/schema";
+import type { BlockLog, FrameDrillLog, Frame, SessionLog } from "../src/telemetry/schema";
 
 /** Synthetic player: aims at the target `lag` seconds late with a fixed vertical offset. Fully deterministic. */
-export function synthDrill(id: "pb" | "close" | "mid", fps: number, lag: number, pitchOff = 0): DrillLog {
+export function synthDrill(id: "pb" | "close" | "mid", fps: number, lag: number, pitchOff = 0): FrameDrillLog {
   const d = DRILLS[id];
   const m = createMover({ mix: d.mix!, sub: d.sub!, bound: d.bound! }, mulberry32(d.seed));
   const hist: { t: number; yaw: number }[] = [];
