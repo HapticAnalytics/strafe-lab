@@ -101,8 +101,11 @@ export interface SessionLog {
   rawInput: boolean;
   sampling: "per-frame" | "event";
   capture?: CaptureDiagnostics;
-  /** "v3" = Sensitivity Intelligence v3 (Milestone 2). Absent = the V2 classic protocol. */
-  protocol?: "v3";
+  /** "v3" = Sensitivity Intelligence v3 (Milestone 2); "battery" = fixed baseline battery (Milestone 3);
+   *  "train" = training session (Milestone 7). Absent = the V2 classic protocol. */
+  protocol?: "v3" | "battery" | "train";
+  /** battery: which fixed held-out seed set was used */
+  seedSet?: number;
   mode?: "quick" | "standard" | "deep";
   /** seeds every block/segment of the session (see sim/protocol.ts seedFor) */
   sessionSeed?: number;
@@ -122,12 +125,29 @@ export interface CalibrationRecord {
   result: Record<string, number | string | null>;
 }
 
+// ---------- external results (Milestone 3: Firing Range, R5 Reloaded, aim trainer) ----------
+
+export type ExternalKind = "firing-range" | "r5" | "trainer";
+export interface ExternalResult {
+  id: string;
+  at: string;
+  kind: ExternalKind;
+  /** e.g. "R-99 60 s strafe-dummy damage", or the aim-trainer scenario name */
+  measure: string;
+  value: number;
+  unit: string;
+  higherIsBetter: boolean;
+  /** free text: exact settings used, video file name */
+  notes: string;
+}
+
 export interface ExportFile {
   format: typeof EXPORT_FORMAT;
   schema: number;
   exportedAt: string;
   sessions: SessionLog[];
   calibrations?: CalibrationRecord[];
+  external?: ExternalResult[];
 }
 
 const isNum = (v: unknown): v is number => typeof v === "number" && isFinite(v);

@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import { EXPORT_FORMAT, EXPORT_VERSION, sessionProblem, type CalibrationRecord, type ExportFile, type Settings, type SessionLog } from "../telemetry/schema";
+import { EXPORT_FORMAT, EXPORT_VERSION, sessionProblem, type CalibrationRecord, type ExportFile, type ExternalResult, type Settings, type SessionLog } from "../telemetry/schema";
 
 interface MetaRow { key: string; value: unknown }
 
@@ -8,12 +8,15 @@ export class LabDB extends Dexie {
   sessions!: Table<SessionLog, string>;
   meta!: Table<MetaRow, string>;
   calibrations!: Table<CalibrationRecord, string>;
+  external!: Table<ExternalResult, string>;
 
   constructor(name = "strafe-lab") {
     super(name);
     this.version(1).stores({ sessions: "id, startedAt, status", meta: "key" });
     // v2: calibration records (Milestone 1). Additive, so no data migration needed.
     this.version(2).stores({ sessions: "id, startedAt, status", meta: "key", calibrations: "id, at, kind" });
+    // v3: external results (Milestone 3). Additive.
+    this.version(3).stores({ sessions: "id, startedAt, status", meta: "key", calibrations: "id, at, kind", external: "id, at, kind" });
   }
 }
 
@@ -43,8 +46,12 @@ export async function listCalibrations(db: LabDB): Promise<CalibrationRecord[]> 
   return db.calibrations.orderBy("at").toArray();
 }
 
+export async function saveExternal(db: LabDB, r: ExternalResult): Promise<void> { await db.external.put(r); }
+export async function listExternal(db: LabDB): Promise<ExternalResult[]> { return db.external.orderBy("at").toArray(); }
+export async function deleteExternal(db: LabDB, id: string): Promise<void> { await db.external.delete(id); }
+
 export async function exportAll(db: LabDB, now = new Date()): Promise<ExportFile> {
-  return { format: EXPORT_FORMAT, schema: EXPORT_VERSION, exportedAt: now.toISOString(), sessions: await listSessions(db), calibrations: await listCalibrations(db) };
+  return { format: EXPORT_FORMAT, schema: EXPORT_VERSION, exportedAt: now.toISOString(), sessions: await listSessions(db), calibrations: await listCalibrations(db), external: await listExternal(db) };
 }
 
 /** Parse and validate an export file (export versions 1 and 2). Throws with a readable message; writes nothing. */
@@ -57,15 +64,17 @@ export function parseExport(text: string): ExportFile {
   if (!Array.isArray(f.sessions)) throw new Error("Export has no sessions list.");
   f.sessions.forEach((s, i) => { const p = sessionProblem(s); if (p) throw new Error(`Session ${i + 1}: ${p}.`); });
   if (f.calibrations !== undefined && !Array.isArray(f.calibrations)) throw new Error("Calibrations is not a list.");
+  if (f.external !== undefined && (!Array.isArray(f.external) || f.external.some(e => typeof e?.value !== "number" || typeof e?.measure !== "string"))) throw new Error("External results are malformed.");
   return f as ExportFile;
 }
 
 /** Upsert by id. All-or-nothing: validation happens before any write. Returns the number of sessions imported. */
 export async function importAll(db: LabDB, text: string): Promise<number> {
   const f = parseExport(text);
-  await db.transaction("rw", db.sessions, db.calibrations, async () => {
+  await db.transaction("rw", db.sessions, db.calibrations, db.external, async () => {
     await db.sessions.bulkPut(f.sessions);
     if (f.calibrations?.length) await db.calibrations.bulkPut(f.calibrations);
+    if (f.external?.length) await db.external.bulkPut(f.external);
   });
   return f.sessions.length;
 }

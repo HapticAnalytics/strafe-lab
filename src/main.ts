@@ -13,6 +13,8 @@ import { fitCurve } from "./analysis/fit";
 import { copyText, previousRec, resultsHTML } from "./ui/results";
 import { Runner } from "./ui/runner";
 import { setupCalibration } from "./ui/calibration";
+import { setupBaseline } from "./ui/baseline";
+import { batteryMetrics } from "./analysis/battery";
 import { computeV3, type V3Result } from "./analysis/result3";
 import { resultsV3HTML } from "./ui/results3";
 import { estimatedMinutes, MODES, type Mode } from "./sim/protocol";
@@ -63,6 +65,7 @@ function v3Of(s: SessionLog): V3Result {
 /** One-line summary for the history list: [label, recommended sens or null] */
 function summary(s: SessionLog): string | null {
   if (s.status !== "complete") return null;
+  if (s.protocol === "battery") return `battery combined ${fmt(batteryMetrics(s)[0]?.value, 1)}`;
   if (s.protocol === "v3") {
     const r = v3Of(s);
     if (!r.overall || !r.rec) return null;
@@ -81,7 +84,7 @@ async function refreshHistory(): Promise<SessionLog[]> {
   $("#histList").innerHTML = all.length
     ? [...all].reverse().map(s => {
         const res = summary(s);
-        const label = `${new Date(s.startedAt).toLocaleString()} · ${s.protocol === "v3" ? MODES[s.mode ?? "standard"].label : "classic"} · ${s.status.replace("_", " ")} · ${s.blocks.length} blocks`;
+        const label = `${new Date(s.startedAt).toLocaleString()} · ${s.protocol === "v3" ? MODES[s.mode ?? "standard"].label : s.protocol === "battery" ? "Baseline battery" : "classic"} · ${s.status.replace("_", " ")} · ${s.blocks.length} blocks`;
         return `<li style="grid-template-columns:1fr auto"><span>${label}${res ? ` · ${res}` : ""}</span>${res ? `<button class="btn ghost" data-open="${s.id}" type="button" style="padding:6px 12px">Open</button>` : ""}</li>`;
       }).join("")
     : `<li><span class="note">No sessions yet.</span></li>`;
@@ -91,6 +94,7 @@ async function refreshHistory(): Promise<SessionLog[]> {
 
 function showResults(s: SessionLog, all: SessionLog[]): void {
   const box = $("#results");
+  if (s.protocol === "battery") { baseline.open(); return; }
   if (s.protocol === "v3") {
     box.innerHTML = resultsV3HTML(s, v3Of(s));
     $("#setup").hidden = true; box.hidden = false; scrollTo(0, 0);
@@ -111,19 +115,33 @@ function showResults(s: SessionLog, all: SessionLog[]): void {
   setupCoach(s, r);
 }
 
-function startTest(): void {
-  const settings = readSettings();
-  saveSettings(db, settings).catch(() => {});
+function ensureRunner(): Runner {
   if (!scene) {
     scene = new RangeScene($<HTMLCanvasElement>("#view"));
     runner = new Runner(scene, mouse, {
       persist: s => { saveSession(db, s).catch(err => console.error("save failed", err)); },
-      finished: async s => { const all = await refreshHistory(); showResults(s, all); },
+      finished: async s => {
+        const all = await refreshHistory();
+        if (s.protocol === "battery") await baseline.open(); else showResults(s, all);
+      },
       quit: () => { refreshHistory(); },
     });
   }
-  runner!.start(settings, ($<HTMLSelectElement>("#mode").value as Mode) || "standard");
+  return runner!;
 }
+
+function startTest(): void {
+  const settings = readSettings();
+  saveSettings(db, settings).catch(() => {});
+  ensureRunner().start(settings, ($<HTMLSelectElement>("#mode").value as Mode) || "standard");
+}
+
+const baseline = setupBaseline(db, seedSet => {
+  const settings = readSettings();
+  saveSettings(db, settings).catch(() => {});
+  ensureRunner().startBattery(settings, seedSet);
+});
+$("#baseOpen").addEventListener("click", () => baseline.open());
 $("#startBtn").addEventListener("click", startTest);
 const calibration = setupCalibration(db, readSettings);
 $("#calOpen").addEventListener("click", () => calibration.open());

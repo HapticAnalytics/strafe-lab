@@ -69,6 +69,11 @@
     <p class="note">Enemy movement uses Apex movement speeds (verified): about 4.4 m/s strafing with a gun out, 2 m/s crouch-walking, 7.6 m/s sprinting. Every block uses fresh random seeds so you can't memorise patterns, and the order of sensitivities is counterbalanced so warming up or tiring out doesn't bias the result.</p>
   </section>
 
+  <section class="panel" aria-labelledby="base-h">
+    <div class="row" style="justify-content:space-between"><h2 id="base-h" style="font-size:20px">Baseline and noise floor</h2><button class="btn ghost" id="baseOpen" type="button">Open baseline</button></div>
+    <p class="note">Before training, run the 2.5-minute baseline battery on 3 separate days and log your Firing Range and aim-trainer benchmarks. That measures how much your numbers move day to day, which is the bar any later improvement has to clear.</p>
+  </section>
+
   <section class="panel" aria-labelledby="cal-h">
     <div class="row" style="justify-content:space-between"><h2 id="cal-h" style="font-size:20px">Calibration and input check</h2><button class="btn ghost" id="calOpen" type="button">Open calibration</button></div>
     <p class="note">Checks that Strafe Lab reads your mouse the way Apex does: a ruler DPI test, a physical 360° test and an input timing test. Do these once on your gaming PC before trusting any numbers.</p>
@@ -130,6 +135,43 @@
     </section>
   </div>
   <div class="row"><button class="btn ghost" id="calBack" type="button">Back to setup</button></div>
+</div>
+
+<div class="wrap" id="baseline" hidden>
+  <header class="brand"><h1>Strafe<span>/</span>Lab</h1><span class="eyebrow">Baseline &amp; noise floor</span></header>
+  <p class="lede">Your noise floor is how much each number changes from one day to the next when nothing has changed. A later improvement only counts if it is bigger than the smallest detectable change (SDC95 = 1.96 × √2 × day-to-day SD).</p>
+  <div class="row"><button class="btn" id="batteryBtn" type="button">Run today's battery</button><span class="note" id="baseStatus"></span></div>
+  <section class="panel"><h2 style="font-size:18px">Noise floor by metric</h2><div class="tablebox" id="floorTable"></div>
+    <p class="note" id="floorNote"></p></section>
+  <div class="grid2">
+    <section class="panel">
+      <h2 style="font-size:18px">Firing Range protocol</h2>
+      <ol class="note" style="padding-left:18px;margin:0;display:flex;flex-direction:column;gap:6px">
+        <li>Same legend and the same weapon every time: R-99 with no attachments (or write your exact kit in Notes).</li>
+        <li>Use the Firing Range dummy settings to make the dummies strafe, and use the same settings every time. Write the exact settings in Notes the first time.</li>
+        <li>Stand at one fixed, marked spot and distance. Note it.</li>
+        <li>Record the attempt with your usual capture tool. For 60 seconds, hipfire only, deal as much damage as you can to the strafing dummies.</li>
+        <li>Count total damage from the recording and enter it below as "R-99 60 s strafe damage" in dmg. Keep the video; note its file name.</li>
+      </ol>
+      <h2 style="font-size:18px">R5 Reloaded (optional) and aim trainer</h2>
+      <p class="note">Use the same mode, map, settings and scenario every time and note them. For an aim trainer, enter the scenario name as the measure and its score.</p>
+    </section>
+    <section class="panel">
+      <h2 style="font-size:18px">Add a result</h2>
+      <div class="fields">
+        <label for="extKind">Protocol<select id="extKind"><option value="firing-range">Firing Range</option><option value="r5">R5 Reloaded</option><option value="trainer">Aim trainer</option></select></label>
+        <label for="extValue">Value<input id="extValue" type="number" step="any"></label>
+        <label for="extUnit">Unit<input id="extUnit" type="text" value="dmg" style="font-size:15px"></label>
+      </div>
+      <label for="extMeasure">Measure<input id="extMeasure" type="text" list="extMeasures" value="R-99 60 s strafe damage" style="font-size:15px"></label>
+      <datalist id="extMeasures"></datalist>
+      <label for="extNotes">Notes (settings, video file)<input id="extNotes" type="text" style="font-size:15px"></label>
+      <label style="flex-direction:row;align-items:center;gap:8px"><input id="extHigher" type="checkbox" checked style="width:auto"> Higher is better</label>
+      <div class="row"><button class="btn" id="extSave" type="button">Save result</button><span class="note" id="extNote"></span></div>
+      <ul class="insights" id="extList"></ul>
+    </section>
+  </div>
+  <div class="row"><button class="btn ghost" id="baseBack" type="button">Back to setup</button></div>
 </div>
 
 <div id="calibPad" hidden>

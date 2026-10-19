@@ -95,3 +95,23 @@ test("mode selector offers Quick, Standard and Deep with durations", async ({ pa
   await expect(page.locator("#mode")).toHaveValue("standard");
   await expect(page.locator("#mode option").first()).toContainText("Quick · about");
 });
+
+test("baseline screen: add a Firing Range result and see it in the noise-floor table", async ({ page }) => {
+  await page.goto("/");
+  await page.click("#baseOpen");
+  await expect(page.locator("#baseline")).toBeVisible();
+  await expect(page.locator("#baseStatus")).toContainText("0 batteries");
+  await page.fill("#extValue", "3150");
+  await page.click("#extSave");
+  await expect(page.locator("#extList")).toContainText("R-99 60 s strafe damage: 3150.0 dmg");
+  await expect(page.locator("#floorTable")).toContainText("Firing Range · R-99 60 s strafe damage");
+});
+
+test("the baseline battery starts at the player's own sens", async ({ page }) => {
+  await page.goto("/");
+  await page.click("#baseOpen");
+  await page.click("#batteryBtn");
+  await expect(page.locator("#range")).toBeVisible();
+  await expect(page.locator("#ovEyebrow")).toContainText("Baseline battery · round 1 of 2");
+  await page.click("#ovQuit");
+});

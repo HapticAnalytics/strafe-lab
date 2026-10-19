@@ -9,6 +9,7 @@ import type { RangeScene } from "../render/scene";
 import { DRILLS } from "../sim/drills";
 import { DrillEvaluator } from "../sim/evaluator";
 import { MODES, planSweep, planZoom, seedFor, type Mode, type PlannedBlock, type Segment } from "../sim/protocol";
+import { batteryPlan } from "../sim/battery";
 import { buildScenario, hitAt, targetView, type Scenario } from "../sim/scenario";
 import { BlockRecorder } from "../telemetry/recorder";
 import { SCHEMA_VERSION, type Settings, type SessionLog } from "../telemetry/schema";
@@ -79,8 +80,27 @@ export class Runner {
       status: "in_progress", settings, rawInput: false, sampling: "event", capture: this.mouse.diag,
       protocol: "v3", mode, sessionSeed: seed, blocks: [],
     };
+    this.open(settings);
+  }
+
+  /** Milestone 3 baseline battery: fixed held-out scenarios at the player's own sens, no sens changes. */
+  startBattery(settings: Settings, seedSet: number): void {
+    const cm = cmPer360(settings.sens, settings.dpi);
+    this.plan = batteryPlan(seedSet).map(b => ({ cm, phase: "sweep" as const, warm: false, acc: b.acc, segments: b.segments }));
+    this.totalPlanned = this.plan.length;
+    this.zoomPlanned = true;
+    this.bi = 0;
+    this.session = {
+      schema: SCHEMA_VERSION, id: crypto.randomUUID(), startedAt: new Date().toISOString(), finishedAt: null,
+      status: "in_progress", settings, rawInput: false, sampling: "event", capture: this.mouse.diag,
+      protocol: "battery", seedSet, blocks: [],
+    };
+    this.open(settings);
+  }
+
+  private open(settings: Settings): void {
     this.scene.setView(settings.fovScale, settings.display);
-    $("#setup").hidden = true; $("#results").hidden = true; $("#range").hidden = false;
+    $("#setup").hidden = true; $("#results").hidden = true; $("#baseline").hidden = true; $("#range").hidden = false;
     this.scene.resize();
     try { $("#range").requestFullscreen?.().catch(() => {}); } catch { /* ignore */ }
     this.showReady();
@@ -92,9 +112,12 @@ export class Runner {
     const b = this.plan[this.bi];
     this.scene.hideEnemies(); $("#hpbars").hidden = true; $("#banner").hidden = true;
     const n = this.bi + 1;
-    $("#ovEyebrow").textContent = b.warm ? "Warm-up · not scored" : `Block ${n} of ${this.totalPlanned} · ${b.phase === "zoom" ? "zoom" : "sweep"} · sensitivity hidden`;
-    $("#ovTitle").textContent = b.warm ? "Get your hand moving" : b.phase === "zoom" ? "Zooming in" : "Next block";
-    $("#ovText").textContent = b.warm
+    const battery = this.session.protocol === "battery";
+    $("#ovEyebrow").textContent = battery ? `Baseline battery · round ${n} of ${this.totalPlanned} · your own sens` : b.warm ? "Warm-up · not scored" : `Block ${n} of ${this.totalPlanned} · ${b.phase === "zoom" ? "zoom" : "sweep"} · sensitivity hidden`;
+    $("#ovTitle").textContent = battery ? (n === 1 ? "Baseline battery" : "Round two") : b.warm ? "Get your hand moving" : b.phase === "zoom" ? "Zooming in" : "Next block";
+    $("#ovText").textContent = battery
+      ? "Same fixed drills as every battery, at your normal sens. Play it like a real fight; this measures your day-to-day noise floor."
+      : b.warm
       ? "One short block at your current sens so your first scored block isn't cold. Same skills as the real test."
       : b.phase === "zoom" ? "These blocks test small steps around your best zone, some of them twice, to pin down your number."
       : "New hidden sensitivity. Some will feel very fast or very slow on purpose. Play every one like a real fight.";
@@ -132,7 +155,7 @@ export class Runner {
     this.k = radPerCount(b.cm, this.session.settings.dpi);
     this.session.rawInput = this.mouse.rawInput;
     $("#overlay").hidden = true;
-    const round = b.warm ? null : b.phase === "zoom" ? 2 : 1;
+    const round = b.warm || this.session.protocol === "battery" ? null : b.phase === "zoom" ? 2 : 1;
     this.B = { steps: [b.acc, ...b.segments], step: -1, inGap: false, t0: 0, gapUntil: 0, seg: null, sc: null, ev: null, rec: new BlockRecorder(this.bi, b.warm, round, b.cm) };
     this.live = true; this.phase = "live";
     this.nextStep(performance.now());
