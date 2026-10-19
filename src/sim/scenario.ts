@@ -27,6 +27,9 @@ export interface Scenario {
   damage: { body: number; head: number; hp: number } | null;
   /** spawn drills: one target at a time from a pre-generated list */
   spawn: { def: SpawnDef; targets: SpawnTarget[] } | null;
+  /** Milestone 9: the player moves with WASD (key events integrate the eye position) */
+  playerMoves?: boolean;
+  movement?: import("./movement").MovementSpec;
 }
 
 const STILL: EnemyState = { x: 0, y: 0, h: 1 };
@@ -43,7 +46,11 @@ export function buildScenario(id: DrillId, seed: number, dur: number, params?: N
       return { id, seed, dur, lanes, traj, damage: { body: DPS_BODY, head: DPS_HEAD, hp: HP }, spawn: null };
     }
     const traj = buildTrajectories([{ profile: prof, x0: 0 }], seed, dur);
-    return { id, seed, dur, lanes: [{ theta: 0, dist: params.dist, size: params.size, ...(params.distOsc ? { distOsc: params.distOsc } : {}) }], traj, damage: null, spawn: null };
+    return {
+      id, seed, dur, lanes: [{ theta: 0, dist: params.dist, size: params.size, ...(params.distOsc ? { distOsc: params.distOsc } : {}) }], traj, damage: null, spawn: null,
+      ...(params.movement ? { movement: params.movement } : {}),
+      ...(params.movement && params.movement.cond !== "still" ? { playerMoves: true } : {}),
+    };
   }
   if (id === "duo") {
     const traj = buildTrajectories(DUO_ENEMIES.map(e => ({ profile: DUO_PROFILE, x0: e.x0 })), seed, dur);
@@ -88,10 +95,13 @@ export interface TargetView {
   feet: Vec3; h: number; size: number;
 }
 
-export function targetView(sc: Scenario, i: number, t: number): TargetView {
+/** eye: the player's position (Milestone 9 movement); targets are returned relative to it. */
+export function targetView(sc: Scenario, i: number, t: number, eye?: { x: number; z: number }): TargetView {
   const s = enemyState(sc, i, t), lane = sc.lanes[i];
   const dist = laneDist(lane, t);
-  const c = enemyChest(s, lane.theta, dist), a = angTo(c), feet = feetPos(lane, s, dist);
+  const cw = enemyChest(s, lane.theta, dist), fw = feetPos(lane, s, dist);
+  const ex = eye?.x ?? 0, ez = eye?.z ?? 0;
+  const c = { x: cw.x - ex, y: cw.y, z: cw.z - ez }, feet = { x: fw.x - ex, y: fw.y, z: fw.z - ez }, a = angTo(c);
   const dh = Math.hypot(c.x, c.z);
   const top = Math.atan2(feet.y + BODY_HEIGHT * s.h - EYE, dh), bottom = Math.atan2(feet.y - EYE, dh);
   const size = lane.size ?? 1;

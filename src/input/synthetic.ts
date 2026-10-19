@@ -6,6 +6,7 @@ import { wrap } from "../core/math";
 import { mulberry32 } from "../core/rng";
 import { DrillEvaluator } from "../sim/evaluator";
 import { hitAt, targetView, type Scenario } from "../sim/scenario";
+import { promptAt } from "../sim/movement";
 import type { InputSample } from "../telemetry/schema";
 import type { RawParent } from "./capture";
 
@@ -21,6 +22,8 @@ export interface PlayerModel {
   /** white noise on the desired yaw (deg, uniform +/-) from a seeded RNG */
   noiseDeg?: number;
   seed?: number;
+  /** Milestone 9: press A/D to follow the scenario's movement prompts (reaction delay = lag) */
+  followPrompts?: boolean;
 }
 
 const DEGR = Math.PI / 180;
@@ -36,6 +39,8 @@ export function synthPlayerEvents(sc: Scenario, k: number, p: PlayerModel, pollH
   const out: InputSample[] = [];
   const gain = p.gain ?? 1;
   let lastClick = -1;
+  let held: -1 | 0 | 1 = 0;
+  const spec = sc.movement ?? null;
   for (let i = 1; i / pollHz <= sc.dur; i++) {
     const t = i / pollHz;
     ev.advanceTo(t - 1 / pollHz);
@@ -53,7 +58,18 @@ export function synthPlayerEvents(sc: Scenario, k: number, p: PlayerModel, pollH
     } else {
       let tgt = 0;
       while (tgt < sc.lanes.length - 1 && !ev.alive(tgt)) tgt++;
-      tv = targetView(sc, tgt, Math.max(0, t - p.lag));
+      tv = targetView(sc, tgt, Math.max(0, t - p.lag), sc.playerMoves ? ev.eye() : undefined);
+      if (p.followPrompts && spec && sc.playerMoves) {
+        const want = promptAt(sc, spec, Math.max(0, t - p.lag));
+        if (want !== held) {
+          const keys: InputSample[] = [];
+          if (held === 1) keys.push({ t, dx: 0, dy: 0, key: "d", up: 1 });
+          if (held === -1) keys.push({ t, dx: 0, dy: 0, key: "a", up: 1 });
+          if (want === 1) keys.push({ t, dx: 0, dy: 0, key: "d" });
+          if (want === -1) keys.push({ t, dx: 0, dy: 0, key: "a" });
+          out.push(...keys); ev.push(keys); held = want;
+        }
+      }
     }
     let wantYaw = tv.yaw;
     if (p.tremorDeg) wantYaw += p.tremorDeg * DEGR * Math.sin(2 * Math.PI * (p.tremorHz ?? 10) * t);

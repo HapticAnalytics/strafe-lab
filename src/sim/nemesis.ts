@@ -24,6 +24,8 @@ export interface NemesisParams {
   targets: 1 | 2;
   /** optional range change: distance = dist + amp * sin(2 pi t / period) (combat scenarios) */
   distOsc?: { amp: number; period: number };
+  /** Milestone 9: movement condition (the player moves unless cond is "still") */
+  movement?: import("./movement").MovementSpec;
 }
 
 interface Anchor { dist: number; speedScale: number; accel: number; sub: [number, number]; jitter: number; mix: Mix; bound: number; size: number }

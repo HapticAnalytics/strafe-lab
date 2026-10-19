@@ -5,6 +5,7 @@ import { applyDelta, type Aim } from "../core/crosshair";
 import { wrap } from "../core/math";
 import type { InputSample } from "../telemetry/schema";
 import { hitAt, targetView, type Scenario } from "./scenario";
+import { lateral, newPlayer, stepPlayer, type PlayerState } from "./player";
 
 // APPROX: 1 kHz evaluation grid. Crosshair state is exact at each tick (all events with t <= tick applied); hit
 // and damage resolution is 1 ms, finer than any render frame and than 1000 Hz mouse polling.
@@ -23,6 +24,8 @@ export interface Sample {
   /** trigger (left button) held at this tick, and presses that happened during it */
   trig: 0 | 1;
   press: number;
+  /** player position (m) and lateral velocity relative to the view (m/s, + = right); 0 when the player can't move */
+  px: number; pz: number; pv: number;
 }
 
 export interface Kill { i: number; t: number }
@@ -51,6 +54,7 @@ export class DrillEvaluator {
   counts = 0;
   clicks = 0;
   trig: 0 | 1 = 0;
+  readonly player: PlayerState = newPlayer();
   private pressesNow = 0;
   /** next grid tick index to evaluate */
   private tick = 0;
@@ -93,7 +97,7 @@ export class DrillEvaluator {
     const sp = this.sc.spawn!;
     if (t < this.sAt) {
       // between targets: keep the 1 kHz sample grid uniform (aim only; nothing to hit)
-      if (this.keepSamples) { const tv = targetView(this.sc, this.si, 0); this.samples.push({ t, yaw: this.aim.yaw, pitch: this.aim.pitch, ty: tv.yaw, tp: tv.pitch, hw: tv.hw, vh: tv.vh, on: 0, target: -1, c: this.counts, trig: this.trig, press: this.pressesNow }); }
+      if (this.keepSamples) { const tv = targetView(this.sc, this.si, 0); this.samples.push({ t, yaw: this.aim.yaw, pitch: this.aim.pitch, ty: tv.yaw, tp: tv.pitch, hw: tv.hw, vh: tv.vh, on: 0, target: -1, c: this.counts, trig: this.trig, press: this.pressesNow, ...this.pos() }); }
       return;
     }
     const i = this.si, local = t - this.sAt;
@@ -113,7 +117,7 @@ export class DrillEvaluator {
     } else {
       for (const hitKind of clicksNow) { if (hitKind) { complete = true; break; } rec.misses++; }
     }
-    if (this.keepSamples) this.samples.push({ t, yaw: this.aim.yaw, pitch: this.aim.pitch, ty: tv.yaw, tp: tv.pitch, hw: tv.hw, vh: tv.vh, on, target: i, c: this.counts, trig: this.trig, press: this.pressesNow });
+    if (this.keepSamples) this.samples.push({ t, yaw: this.aim.yaw, pitch: this.aim.pitch, ty: tv.yaw, tp: tv.pitch, hw: tv.hw, vh: tv.vh, on, target: i, c: this.counts, trig: this.trig, press: this.pressesNow, ...this.pos() });
     if (complete) rec.done = t;
     if (complete || local >= sp.def.timeout - 1e-9) {
       this.si = Math.min(sp.targets.length - 1, this.si + 1);
@@ -133,6 +137,7 @@ export class DrillEvaluator {
       const clicksNow: number[] = [];
       while (this.ei < this.events.length && this.events[this.ei].t <= t + 1e-12) {
         const e = this.events[this.ei++];
+        if (e.key) { this.player.keys[e.key] = !e.up; continue; }
         if (e.b === -1) { this.trig = 0; continue; }
         if (e.b) {
           this.clicks++; this.trig = 1; this.pressesNow++;
@@ -143,20 +148,21 @@ export class DrillEvaluator {
         applyDelta(this.aim, e.dx, e.dy, this.k);
         this.counts += Math.hypot(e.dx, e.dy);
       }
+      if (sc.playerMoves) stepPlayer(this.player, this.aim.yaw, GRID_DT);
       if (sc.spawn) { this.spawnTick(t, clicksNow); this.pressesNow = 0; this.tick++; continue; }
       const { yaw, pitch } = this.aim;
       let on: 0 | 1 | 2 = 0, hitI = -1, best = Infinity, target = -1;
       let tv0 = null as ReturnType<typeof targetView> | null;
       for (let i = 0; i < sc.lanes.length; i++) {
         if (!this.alive(i)) continue;
-        const tv = targetView(sc, i, t);
+        const tv = targetView(sc, i, t, sc.playerMoves ? this.eye() : undefined);
         const kind = hitAt(tv, yaw, pitch);
         if (kind && !on) { on = kind; hitI = i; }
         const dd = Math.abs(wrap(tv.yaw - yaw));
         if (dd < best) { best = dd; target = i; tv0 = tv; }
       }
       if (tv0 && this.keepSamples) {
-        this.samples.push({ t, yaw, pitch, ty: tv0.yaw, tp: tv0.pitch, hw: tv0.hw, vh: tv0.vh, on, target, c: this.counts, trig: this.trig, press: this.pressesNow });
+        this.samples.push({ t, yaw, pitch, ty: tv0.yaw, tp: tv0.pitch, hw: tv0.hw, vh: tv0.vh, on, target, c: this.counts, trig: this.trig, press: this.pressesNow, ...this.pos() });
       }
       // damage is applied over [t, t + GRID_DT)
       if (sc.damage && on && hitI >= 0) {
@@ -175,6 +181,12 @@ export class DrillEvaluator {
   }
 
   get dealt(): number { return this.dmgBody + this.dmgHead; }
+
+  /** Player eye position for target views (origin when the player can't move). */
+  eye(): { x: number; z: number } { return { x: this.player.x, z: this.player.z }; }
+  private pos(): { px: number; pz: number; pv: number } {
+    return { px: this.player.x, pz: this.player.z, pv: this.sc.playerMoves ? lateral(this.player, this.aim.yaw) : 0 };
+  }
 }
 
 /** Offline replay of a whole drill log. */
