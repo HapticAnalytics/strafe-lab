@@ -12,6 +12,7 @@ import { chartSVG } from "./ui/chart";
 import { fitCurve } from "./analysis/fit";
 import { copyText, previousRec, resultsHTML } from "./ui/results";
 import { Runner } from "./ui/runner";
+import { setupCalibration } from "./ui/calibration";
 
 const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector(s) as T;
 const db = makeDb();
@@ -92,6 +93,8 @@ function startTest(): void {
   runner!.start(settings);
 }
 $("#startBtn").addEventListener("click", startTest);
+const calibration = setupCalibration(db, readSettings);
+$("#calOpen").addEventListener("click", () => calibration.open());
 
 $("#exportBtn").addEventListener("click", async () => {
   const data = await exportAll(db);

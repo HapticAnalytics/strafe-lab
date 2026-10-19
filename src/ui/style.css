@@ -123,3 +123,5 @@ tr.best td{color:var(--signal)}
 
 select{background:var(--ground);border:1px solid var(--line);color:var(--ink);font:500 15px var(--f-mono);padding:11px 12px;border-radius:4px;width:100%;box-sizing:border-box}
 select:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
+#calibPad{position:fixed;inset:0;z-index:60;background:rgba(10,13,17,.94);display:grid;place-items:center;padding:24px}
+[hidden]{display:none!important}

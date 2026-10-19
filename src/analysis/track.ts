@@ -113,8 +113,18 @@ export function viewDrill(d: DrillLog | undefined, dpi: number): DrillView {
   return { frames, extra, m1: computeM1(ev.samples, dpi, ev.kills), elapsed: ev.endT };
 }
 
-/** Reads only the block's log (never rendered state). */
+const cache = new WeakMap<BlockLog, { dpi: number; m: BlockMetrics }>();
+
+/** Reads only the block's log (never rendered state). Memoised per block object (logs are immutable once stored). */
 export function analyzeBlock(b: BlockLog, dpi: number): BlockMetrics {
+  const hit = cache.get(b);
+  if (hit && hit.dpi === dpi) return hit.m;
+  const m = analyzeBlockUncached(b, dpi);
+  cache.set(b, { dpi, m });
+  return m;
+}
+
+function analyzeBlockUncached(b: BlockLog, dpi: number): BlockMetrics {
   const v = Object.fromEntries(RANGE_IDS.map(id => [id, viewDrill(b.drills[id], dpi)])) as Record<RangeId, DrillView>;
   const pb = analyzeTrack(v.pb.frames, dpi), close = analyzeTrack(v.close.frames, dpi), mid = analyzeTrack(v.mid.frames, dpi);
   const base = analyzeTrack(v.duo.frames, dpi);

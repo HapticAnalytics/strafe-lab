@@ -54,6 +54,7 @@ export function resultsHTML(s: SessionLog, r: SessionResult, prevCm: number | nu
     <section class="panel"><div class="row" style="justify-content:space-between"><h2 style="font-size:18px">Tracking score by sensitivity</h2><span class="tag">${scored.length} blind blocks · orange = zoom round</span></div><div class="chartbox">${chartSVG(fit, baseCm)}</div></section>
     <section class="panel"><h2 style="font-size:18px">Best sens by range</h2><div class="ranges">${(["pb", "close", "mid", "duo"] as RangeId[]).map(rg).join("")}</div><p class="note">Each range fitted on its own. When these split apart, your overall sens is the weighted compromise: close range and the 2v1 count for 80% of the score because that's where SMG fights are decided.</p></section>
     <section class="panel"><h2 style="font-size:18px">What your mouse data shows</h2><ul class="insights">${r.insights.map(([k, t]) => `<li><span class="pill ${k}">${k === "fix" ? "Fix" : k === "watch" ? "Watch" : "Solid"}</span><span>${t}</span></li>`).join("")}</ul></section>
+    ${m1Section(r)}
     <section class="panel coach" id="coach"><div class="row" style="justify-content:space-between"><h2 style="font-size:18px">AI tracking coach</h2><span class="tag">Claude</span></div>
       <p class="note" id="coachNote">Claude reads every metric from every block, range by range, and explains how your tracking changes from fast to slow sens, what's costing you SMG fights, and what to drill.</p>
       <div class="row"><button class="btn" id="coachBtn" type="button" hidden>Get tracking coaching</button><button class="btn ghost" id="coachStop" type="button" hidden>Stop</button></div>
@@ -87,4 +88,29 @@ export function coachReport(s: SessionLog, r: SessionResult): object {
       pointBlank: r1(b.data.pb), closeDuel: r1(b.data.close), midRange: r1(b.data.mid), twoVsOne: r1(b.data.duo),
     })),
   };
+}
+
+const M1_ROWS: [keyof NonNullable<SessionResult["m1"]>["pb"], string, number, string][] = [
+  ["onPct", "Time on target", 0, "%"], ["headPct", "Head time", 0, "%"],
+  ["errHNorm", "Horizontal error", 2, "× half-width"], ["errVNorm", "Vertical error", 2, "× half-height"],
+  ["trailingPct", "Trailing (when off)", 0, "%"], ["leadingPct", "Leading (when off)", 0, "%"],
+  ["overshootPerS", "Overshoots", 2, "/s"], ["undershootPerS", "Undershoots", 2, "/s"],
+  ["jitterHDeg", "Jitter, horizontal", 3, "°"], ["jitterVDeg", "Jitter, vertical", 3, "°"],
+  ["correctionsPerS", "Corrections", 2, "/s"], ["correctionAmpDeg", "Correction size", 2, "°"],
+  ["reversalLatencyMs", "Reversal response", 0, "ms"], ["reacquireMs", "Reacquire after loss", 0, "ms"],
+  ["stabilizeMs", "Stabilise after acquiring", 0, "ms"], ["switchMs", "Switch time (2v1)", 0, "ms"],
+  ["asymmetryPct", "Left − right on target", 1, "pts"], ["windowSdPct", "Consistency (SD of 2 s windows)", 1, "pts"],
+  ["driftPctPerS", "Drift within drill", 2, "pts/s"], ["handSpeedPeak", "Peak hand speed", 0, "cm/s"],
+];
+
+function m1Section(r: SessionResult): string {
+  if (!r.m1) return `<section class="panel"><h2 style="font-size:18px">Tracking detail</h2><p class="note">This session was recorded with the Milestone 0 per-frame logger, so event-level metrics are not available. New sessions record every mouse event.</p></section>`;
+  const ids = ["pb", "close", "mid", "duo"] as const;
+  const rows = M1_ROWS.map(([k, label, d, unit]) => `<tr><td>${label}</td>${ids.map(id => `<td>${fmt(r.m1![id][k] as number | null, d)}</td>`).join("")}<td>${unit}</td></tr>`).join("");
+  const t = r.timing;
+  return `<section class="panel"><h2 style="font-size:18px">Tracking detail</h2>
+    <div class="tablebox"><table><thead><tr><th>Metric (mean of scored blocks)</th><th>Point-blank</th><th>Close</th><th>Mid</th><th>2v1</th><th>Unit</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="note">Every value is recomputed from the logged mouse events on a 1 ms grid. Thresholds behind these metrics are approximations (see RESEARCH.md). Compare them with your own baseline, not with other players.</p>
+    ${t ? `<p class="note">Input: ${t.source}${t.coalescedApi ? " + coalesced events" : ""} · ${t.samples} events · polling ≈ ${t.pollingHz ? fmt(t.pollingHz, 0) + " Hz" : "—"} · coalesced mismatches ${t.coalescedMismatch} · backwards timestamps ${t.nonMonotonic} · late events ${t.late}</p>` : ""}
+  </section>`;
 }

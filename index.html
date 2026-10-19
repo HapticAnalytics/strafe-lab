@@ -64,6 +64,11 @@
     <p class="note">Enemy movement uses Apex's real speeds: about 4.4 m/s strafing with a gun out, 2 m/s crouch-walking, 7.6 m/s sprinting. Every block replays the exact same movement, so your sensitivity is the only thing that changes.</p>
   </section>
 
+  <section class="panel" aria-labelledby="cal-h">
+    <div class="row" style="justify-content:space-between"><h2 id="cal-h" style="font-size:20px">Calibration and input check</h2><button class="btn ghost" id="calOpen" type="button">Open calibration</button></div>
+    <p class="note">Checks that Strafe Lab reads your mouse the way Apex does: a ruler DPI test, a physical 360° test and an input timing test. Do these once on your gaming PC before trusting any numbers.</p>
+  </section>
+
   <section class="panel" aria-labelledby="hist-h">
     <h2 id="hist-h" style="font-size:20px">Saved sessions</h2>
     <p class="note">Stored in this browser only. Export a JSON backup to move them or keep them safe.</p>
@@ -78,6 +83,47 @@
 </div>
 
 <div class="wrap" id="results" hidden></div>
+
+<div class="wrap" id="calib" hidden>
+  <header class="brand"><h1>Strafe<span>/</span>Lab</h1><span class="eyebrow">Calibration</span></header>
+  <p class="lede">Each test captures raw mouse counts and timestamps the same way the drills do. Repeat each test 3 times; the spread tells you how much is your hand and how much is the input.</p>
+  <div class="grid2">
+    <section class="panel">
+      <h2 style="font-size:18px">1 · Ruler DPI test</h2>
+      <p class="note">Put a ruler beside your mousepad. Line the mouse edge up with 0, start, slide it straight to the distance mark, then press Space or click.</p>
+      <div class="fields"><label for="calCm">Distance cm<input id="calCm" type="number" min="1" max="60" step="0.5" value="10"></label></div>
+      <div class="row"><button class="btn" data-cal="dpi" type="button">Start ruler test</button></div>
+      <div class="calc" id="calDpiOut"></div>
+    </section>
+    <section class="panel">
+      <h2 style="font-size:18px">2 · Physical 360° test</h2>
+      <p class="note">In the Apex Firing Range, mark two points on your pad that give exactly one 360° turn at your current sens. Here, start, move from mark to mark, then press Space or click. Target: within 1%.</p>
+      <div class="row"><button class="btn" data-cal="turn360" type="button">Start 360° test</button></div>
+      <div class="calc" id="cal360Out"></div>
+    </section>
+    <section class="panel">
+      <h2 style="font-size:18px">3 · Input timing test</h2>
+      <p class="note">Start, then move the mouse in steady circles for 5 seconds. Measures polling rate, whether events are frame-aligned, and integrity counters.</p>
+      <div class="row"><button class="btn" data-cal="polling" type="button">Start timing test</button></div>
+      <div class="calc" id="calPollOut"></div>
+    </section>
+    <section class="panel">
+      <h2 style="font-size:18px">Saved calibrations</h2>
+      <ul class="insights" id="calList"></ul>
+    </section>
+  </div>
+  <div class="row"><button class="btn ghost" id="calBack" type="button">Back to setup</button></div>
+</div>
+
+<div id="calibPad" hidden>
+  <div class="card" style="margin:auto">
+    <span class="eyebrow" id="padEyebrow">Calibration</span>
+    <h2 id="padTitle">Click to lock the mouse</h2>
+    <p id="padText"></p>
+    <p class="meta" id="padLive"></p>
+    <div class="row"><button class="btn ghost" id="padCancel" type="button">Cancel</button></div>
+  </div>
+</div>
 
 <div id="range" hidden>
   <canvas id="view"></canvas>

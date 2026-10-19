@@ -5,9 +5,14 @@ Live build: https://hapticanalytics.github.io/strafe-lab/ (auto-deployed from `m
 
 ## Milestone status
 
+### Runs needed from you (gaming PC)
+1. **Calibration** (Milestone 1): open https://hapticanalytics.github.io/strafe-lab/ in Chrome or Edge, click *Open calibration*, and run each test 3 times: ruler DPI (10 cm), physical 360° (marks taken from the Apex Firing Range at your current sens), input timing (5 s of circles). Then *Export JSON* and send me the file.
+
+
 | Milestone | Status | Notes |
 |---|---|---|
 | 0 Foundation | Done | All acceptance checks pass (unit + Playwright e2e). Added `cl_fovScale` + aspect/scaling display. React deferred to Milestone 5 (dashboard). |
+| 1 Input & telemetry | Built; 2 of 3 acceptance checks pass | Same synthetic trace gives identical logs and metrics at 60/144/240 fps (exact, not just within 0.5%): PASS. Golden files lock every M1 metric: PASS. 360° calibration error < 1%: **needs a run on the gaming PC** (see "Runs needed from you"). |
 | R Research | Done (living doc) | `RESEARCH.md`. Tag lint test enforces tags in `sim/` and `analysis/`. ADS scaling is community-only → APPROX until the user's per-optic calibration. |
 Goal: a personal aim-development lab for Apex Legends MnK that measures correctly first, then coaches, then trains, and proves whether training transfers to real Apex.
 

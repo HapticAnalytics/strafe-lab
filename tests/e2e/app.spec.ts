@@ -51,3 +51,26 @@ test("settings survive a reload", async ({ page }) => {
   await expect(page.locator("#aspect")).toHaveValue("1");
   await expect(page.locator("#scaling")).toHaveValue("blackbars");
 });
+
+test("an event-level (v2) session shows the Milestone 1 tracking detail", async ({ page }, info) => {
+  const { synthSessionV2 } = await import("../helpers");
+  const s = synthSessionV2("e2e-v2");
+  const file = info.outputPath("v2.json");
+  (await import("node:fs")).writeFileSync(file, JSON.stringify({ format: "strafe-lab-export", schema: 2, exportedAt: "2026-01-01T00:00:00.000Z", sessions: [s] }));
+  await page.goto("/");
+  await page.setInputFiles("#importFile", file);
+  await expect(page.locator("#histNote")).toHaveText("Imported 1 session(s).");
+  await page.click("[data-open='e2e-v2']");
+  await expect(page.locator("#results")).toContainText("Tracking detail");
+  await expect(page.locator("#results")).toContainText("Reversal response");
+  await expect(page.locator("#results")).toContainText("Input: synthetic");
+});
+
+test("calibration screen opens and lists no calibrations initially", async ({ page }) => {
+  await page.goto("/");
+  await page.click("#calOpen");
+  await expect(page.locator("#calib")).toBeVisible();
+  await expect(page.locator("#calList")).toContainText("No calibrations yet.");
+  await page.click("#calBack");
+  await expect(page.locator("#setup")).toBeVisible();
+});
