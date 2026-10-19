@@ -14,6 +14,7 @@ import { copyText, previousRec, resultsHTML } from "./ui/results";
 import { Runner } from "./ui/runner";
 import { setupCalibration } from "./ui/calibration";
 import { setupBaseline } from "./ui/baseline";
+import { setupReplay } from "./ui/replay";
 import { batteryMetrics } from "./analysis/battery";
 import { computeV3, type V3Result } from "./analysis/result3";
 import { resultsV3HTML } from "./ui/results3";
@@ -85,10 +86,12 @@ async function refreshHistory(): Promise<SessionLog[]> {
     ? [...all].reverse().map(s => {
         const res = summary(s);
         const label = `${new Date(s.startedAt).toLocaleString()} · ${s.protocol === "v3" ? MODES[s.mode ?? "standard"].label : s.protocol === "battery" ? "Baseline battery" : "classic"} · ${s.status.replace("_", " ")} · ${s.blocks.length} blocks`;
-        return `<li style="grid-template-columns:1fr auto"><span>${label}${res ? ` · ${res}` : ""}</span>${res ? `<button class="btn ghost" data-open="${s.id}" type="button" style="padding:6px 12px">Open</button>` : ""}</li>`;
+        const rp = s.sampling === "event" && s.blocks.length ? `<button class="btn ghost" data-replay="${s.id}" type="button" style="padding:6px 12px">Replay</button>` : "";
+        return `<li style="grid-template-columns:1fr auto"><span>${label}${res ? ` · ${res}` : ""}</span><span class="row" style="gap:6px">${res ? `<button class="btn ghost" data-open="${s.id}" type="button" style="padding:6px 12px">Open</button>` : ""}${rp}</span></li>`;
       }).join("")
     : `<li><span class="note">No sessions yet.</span></li>`;
   document.querySelectorAll<HTMLButtonElement>("[data-open]").forEach(b => (b.onclick = () => showResults(all.find(s => s.id === b.dataset.open)!, all)));
+  document.querySelectorAll<HTMLButtonElement>("[data-replay]").forEach(b => (b.onclick = () => replayView.open(all.find(s => s.id === b.dataset.replay)!)));
   return all;
 }
 
@@ -136,6 +139,7 @@ function startTest(): void {
   ensureRunner().start(settings, ($<HTMLSelectElement>("#mode").value as Mode) || "standard");
 }
 
+const replayView = setupReplay(() => { $("#setup").hidden = false; refreshHistory(); });
 const baseline = setupBaseline(db, seedSet => {
   const settings = readSettings();
   saveSettings(db, settings).catch(() => {});

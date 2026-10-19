@@ -24,8 +24,10 @@ export const OVERSHOOT_WINDOW = 0.2;
 export const REVERSAL_SIDE = 0.05;
 // APPROX: the player has responded once crosshair yaw velocity matches the new direction above MOVING_DEG_S; look up to 600 ms
 export const REVERSAL_WINDOW = 0.6;
-// APPROX: a "loss" needs at least 50 ms on target first; reacquisition searched until drill end
+// APPROX: a "loss" needs at least 50 ms on target first, then at least 30 ms off (shorter spells are edge flicker,
+// found in Milestone 4 replays); reacquisition searched until drill end
 export const LOSS_MIN_ON = 0.05;
+export const LOSS_MIN_OFF = 0.03;
 // APPROX: stabilised = relative speed below 10 deg/s for 100 ms while on target, within 1 s of acquisition
 export const STAB_THRESH_DEG_S = 10;
 export const STAB_HOLD = 0.1;
@@ -90,7 +92,21 @@ function unwrap(xs: number[]): Float64Array {
   return out;
 }
 
+/** Flagged moments, from exactly the same detection as the metrics (Milestone 4 replay). Times in seconds. */
+export interface FlaggedEvents {
+  reversals: { t: number; latencyMs: number | null }[];
+  losses: { t: number; reacquireMs: number | null }[];
+  overshoots: { t: number; magNorm: number }[];
+}
+/** Per-tick series for timelines: target / crosshair yaw rates (rad/s), horizontal / vertical error (rad). */
+export interface M1Series { wt: Float64Array; wc: Float64Array; eh: Float64Array; ev: Float64Array }
+
 export function computeM1(S: Sample[], dpi: number, kills: Kill[] = []): M1Metrics {
+  return analyzeM1(S, dpi, kills).metrics;
+}
+
+export function analyzeM1(S: Sample[], dpi: number, kills: Kill[] = []): { metrics: M1Metrics; events: FlaggedEvents; series: M1Series } {
+  const events: FlaggedEvents = { reversals: [], losses: [], overshoots: [] };
   const n = S.length, dt = n > 1 ? S[1].t - S[0].t : 0.001;
   const T = n * dt;
   const yaw = unwrap(S.map(s => s.yaw));
@@ -126,7 +142,7 @@ export function computeM1(S: Sample[], dpi: number, kills: Kill[] = []): M1Metri
     const sg = Math.sign(eh[i]);
     let peak = 0;
     for (let j = i; j < Math.min(n, i + ow) && Math.sign(eh[j]) === sg; j++) peak = Math.max(peak, Math.abs(eh[j]) / S[j].hw);
-    if (peak > 1) { overs++; overMag.push(peak); }
+    if (peak > 1) { overs++; overMag.push(peak); events.overshoots.push({ t: S[i].t, magNorm: peak }); }
   }
 
   // corrections: runs of relative angular speed above threshold with constant sign
@@ -177,6 +193,7 @@ export function computeM1(S: Sample[], dpi: number, kills: Kill[] = []): M1Metri
     let r = -1;
     for (let j = i; j < Math.min(n, i + rw); j++) if (Math.sign(wc[j]) === sg && Math.abs(wc[j]) > mv) { r = j; break; }
     if (r < 0) revMissed++; else lat.push((r - i) * dt * 1000);
+    events.reversals.push({ t: S[i].t, latencyMs: r < 0 ? null : (r - i) * dt * 1000 });
     i += side; // one reversal per side window
   }
 
@@ -185,9 +202,10 @@ export function computeM1(S: Sample[], dpi: number, kills: Kill[] = []): M1Metri
   const reacq: number[] = [], stab: number[] = []; let losses = 0, onRun = 0;
   for (let i = 0; i < n; i++) {
     if (S[i].on) { onRun++; continue; }
-    if (onRun >= lmin) {
+    let j = i; while (j < n && !S[j].on) j++;
+    if (onRun >= lmin && (j - i) * dt >= LOSS_MIN_OFF - 1e-9) {
       losses++;
-      let j = i; while (j < n && !S[j].on) j++;
+      events.losses.push({ t: S[i].t, reacquireMs: j < n ? (j - i) * dt * 1000 : null });
       if (j < n) {
         reacq.push((j - i) * dt * 1000);
         let calm = 0;
@@ -234,7 +252,7 @@ export function computeM1(S: Sample[], dpi: number, kills: Kill[] = []): M1Metri
     driftPctPerS = den ? num / den : 0;
   }
 
-  return {
+  const metrics: M1Metrics = {
     seconds: T,
     onPct: n ? (on / n) * 100 : 0, headPct: n ? (head / n) * 100 : 0,
     errHDeg: n ? aeh / n / DEG : 0, errVDeg: n ? aev / n / DEG : 0,
@@ -254,4 +272,5 @@ export function computeM1(S: Sample[], dpi: number, kills: Kill[] = []): M1Metri
     leftOnPct, rightOnPct, asymmetryPct: leftOnPct != null && rightOnPct != null ? leftOnPct - rightOnPct : null,
     windowSdPct, driftPctPerS,
   };
+  return { metrics, events, series: { wt, wc, eh, ev } };
 }

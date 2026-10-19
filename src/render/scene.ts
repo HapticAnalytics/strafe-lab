@@ -20,7 +20,8 @@ export class RangeScene {
   private display: Display = { aspect: null, scaling: "stretched" };
   private canvas: HTMLCanvasElement;
 
-  constructor(canvas: HTMLCanvasElement) {
+  /** size: the area the view fills (the window for the range, a panel for the replay viewer) */
+  constructor(canvas: HTMLCanvasElement, private size: () => { w: number; h: number } = () => ({ w: innerWidth, h: innerHeight })) {
     this.canvas = canvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -67,7 +68,8 @@ export class RangeScene {
   setView(fovScale: number, display: Display): void { this.fovScale = fovScale; this.display = display; this.resize(); }
 
   resize(): void {
-    const L = layoutFor(this.display, innerWidth, innerHeight), v = L.viewport;
+    const { w: W, h: H } = this.size();
+    const L = layoutFor(this.display, W, H), v = L.viewport;
     this.renderer.setSize(v.w, v.h, false);
     this.canvas.style.position = "absolute";
     this.canvas.style.left = `${v.x}px`; this.canvas.style.top = `${v.y}px`;
@@ -91,6 +93,16 @@ export class RangeScene {
   }
 
   highlight(i: number, on: boolean): void { this.enemies[i].userData.bodyMat.emissive.setHex(on ? 0x6a2508 : 0x2a0e04); }
+
+  /** Screen position (CSS px within the canvas) of a world point for the current camera, or null if behind. */
+  project(p: { x: number; y: number; z: number }, yaw: number, pitch: number): { x: number; y: number } | null {
+    this.camera.rotation.set(pitch, yaw, 0);
+    this.camera.updateMatrixWorld();
+    const v = new THREE.Vector3(p.x, p.y, p.z).project(this.camera);
+    if (v.z > 1) return null;
+    const c = this.renderer.domElement;
+    return { x: ((v.x + 1) / 2) * c.clientWidth, y: ((1 - v.y) / 2) * c.clientHeight };
+  }
 
   render(yaw: number, pitch: number): void {
     this.camera.rotation.set(pitch, yaw, 0);

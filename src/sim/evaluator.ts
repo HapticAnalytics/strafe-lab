@@ -86,7 +86,11 @@ export class DrillEvaluator {
 
   private spawnTick(t: number, clicksNow: number[]): void {
     const sp = this.sc.spawn!;
-    if (t < this.sAt) { return; }
+    if (t < this.sAt) {
+      // between targets: keep the 1 kHz sample grid uniform (aim only; nothing to hit)
+      if (this.keepSamples) { const tv = targetView(this.sc, this.si, 0); this.samples.push({ t, yaw: this.aim.yaw, pitch: this.aim.pitch, ty: tv.yaw, tp: tv.pitch, hw: tv.hw, vh: tv.vh, on: 0, target: -1, c: this.counts }); }
+      return;
+    }
     const i = this.si, local = t - this.sAt;
     let rec = this.spawns[this.spawns.length - 1];
     if (!rec || rec.i !== i) {

@@ -115,3 +115,22 @@ test("the baseline battery starts at the player's own sens", async ({ page }) =>
   await expect(page.locator("#ovEyebrow")).toContainText("Baseline battery · round 1 of 2");
   await page.click("#ovQuit");
 });
+
+test("replay: flagged moments are one click away and the replay renders", async ({ page }, info) => {
+  const { synthSessionV2 } = await import("../helpers");
+  const file = info.outputPath("rp.json");
+  (await import("node:fs")).writeFileSync(file, JSON.stringify({ format: "strafe-lab-export", schema: 2, exportedAt: "2026-01-01T00:00:00.000Z", sessions: [synthSessionV2("e2e-rp")] }));
+  const errors: string[] = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto("/");
+  await page.setInputFiles("#importFile", file);
+  await page.click("[data-replay='e2e-rp']");
+  await expect(page.locator("#replay")).toBeVisible();
+  await page.selectOption("#rpDrill", "close");
+  const first = page.locator("[data-flag]").last();
+  await expect(first).toBeVisible();
+  await first.click();
+  await expect(page.locator("#rpTime")).not.toHaveText(/^0\.00 s/);
+  await page.screenshot({ path: info.outputPath("replay.png"), fullPage: true });
+  expect(errors).toEqual([]);
+});

@@ -125,3 +125,10 @@ select{background:var(--ground);border:1px solid var(--line);color:var(--ink);fo
 select:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
 #calibPad{position:fixed;inset:0;z-index:60;background:rgba(10,13,17,.94);display:grid;place-items:center;padding:24px}
 [hidden]{display:none!important}
+#rpStage{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:6px;overflow:hidden}
+#rpStage canvas{position:absolute;inset:0;width:100%;height:100%}
+#rpTrails{pointer-events:none}
+#rpStage .xhair{position:absolute;left:50%;top:50%}
+#rpTimeline{display:block;width:100%;min-width:480px;background:var(--panel);border:1px solid var(--line);border-radius:4px;cursor:pointer}
+.flag{appearance:none;background:none;border:0;color:var(--ink);font:inherit;text-align:left;cursor:pointer;padding:0}
+.flag:hover{color:var(--signal)}
