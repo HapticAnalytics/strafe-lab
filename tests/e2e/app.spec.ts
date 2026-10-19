@@ -151,3 +151,16 @@ test("dashboard renders sens history and explains the fingerprint is not ready",
   await page.screenshot({ path: info.outputPath("dashboard.png"), fullPage: true });
   expect(errors).toEqual([]);
 });
+
+test("coach works with the AI off: rule-based plan, settings hold no key", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto("/");
+  await page.click("#dashOpen");
+  await page.getByRole("button", { name: "Daily plan" }).click();
+  await expect(page.locator("#dashboard")).toContainText("Rule-based plan · AI coach is off (no API key set).");
+  await expect(page.locator("#dashboard")).toContainText("Build your baseline first.");
+  await expect(page.locator("#dashboard")).toContainText("No experiments yet.");
+  expect(await page.evaluate(() => localStorage.getItem("strafelab.coach.apiKey"))).toBeNull();
+  expect(errors).toEqual([]);
+});

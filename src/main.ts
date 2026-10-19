@@ -1,6 +1,5 @@
 import "./ui/style.css";
 import { computeResult } from "./analysis/result";
-import { setupCoach } from "./coach/coach";
 import { clamp, fmt } from "./core/math";
 import { ASPECT_PRESETS, type Scaling } from "./core/display";
 import { cmPer360, hfov43FromScale, hfovForAspect, sliderFromFovScale } from "./core/units";
@@ -17,7 +16,10 @@ import { setupBaseline } from "./ui/baseline";
 import { setupReplay } from "./ui/replay";
 import { buildDashboard } from "./analysis/dashboard";
 import { renderDashboard } from "./ui/dashboard";
-import { listExternal } from "./storage/db";
+import { listExternal, listExperiments, saveExperiment } from "./storage/db";
+import { evaluateExperiment, sensLocked } from "./analysis/experiments";
+import { batterySessions } from "./analysis/baseline";
+import { buildContext } from "./coach/facts";
 import { batteryMetrics } from "./analysis/battery";
 import { computeV3, type V3Result } from "./analysis/result3";
 import { resultsV3HTML } from "./ui/results3";
@@ -118,7 +120,6 @@ function showResults(s: SessionLog, all: SessionLog[]): void {
   $("#setupBtn").onclick = () => { box.hidden = true; $("#setup").hidden = false; refreshHistory(); scrollTo(0, 0); };
   $("#copyBtn").onclick = () =>
     navigator.clipboard.writeText(copyText(s, r)).then(() => ($("#copyNote").textContent = "Copied."), () => ($("#copyNote").textContent = "Copy didn't work here. Select the text above instead."));
-  setupCoach(s, r);
 }
 
 function ensureRunner(): Runner {
@@ -136,7 +137,11 @@ function ensureRunner(): Runner {
   return runner!;
 }
 
-function startTest(): void {
+/** ROADMAP Milestone 6 rule: no sens changes during a training block (an active experiment). */
+async function sensLockedNow(): Promise<boolean> { try { return sensLocked(await listExperiments(db)); } catch { return false; } }
+
+async function startTest(): Promise<void> {
+  if (await sensLockedNow() && !confirm("An experiment is active, so your sens is locked. A sens test now would mix sens changes into the experiment. Run it anyway?")) return;
   const settings = readSettings();
   saveSettings(db, settings).catch(() => {});
   ensureRunner().start(settings, ($<HTMLSelectElement>("#mode").value as Mode) || "standard");
@@ -161,12 +166,18 @@ async function exportJson(): Promise<void> {
   a.click();
   URL.revokeObjectURL(a.href);
 }
-$("#dashOpen").addEventListener("click", async () => {
+async function openDashboard(): Promise<void> {
   document.querySelectorAll<HTMLElement>(".wrap").forEach(w => (w.hidden = true));
-  $("#dashboard").hidden = false; scrollTo(0, 0);
-  const d = buildDashboard(await listSessions(db), await listExternal(db));
-  renderDashboard($("#dashRoot"), d, readSettings().dpi, () => { exportJson(); });
-});
+  $("#dashboard").hidden = false;
+  const sessions = await listSessions(db);
+  const d = buildDashboard(sessions, await listExternal(db));
+  const exps = await listExperiments(db);
+  const bat = batterySessions(sessions);
+  const results = exps.map(e => evaluateExperiment(e, bat, d.trends.find(t => t.key === e.metricKey)?.floor));
+  const ctx = buildContext(d, results, sensLocked(exps));
+  renderDashboard($("#dashRoot"), d, readSettings().dpi, () => { exportJson(); }, { d, ctx, experiments: results, saveExperiment: e => saveExperiment(db, e), refresh: () => { openDashboard(); } });
+}
+$("#dashOpen").addEventListener("click", () => { scrollTo(0, 0); openDashboard(); });
 $("#dashBack").addEventListener("click", () => { $("#dashboard").hidden = true; $("#setup").hidden = false; });
 $("#exportBtn").addEventListener("click", async () => {
   const data = await exportAll(db);
@@ -197,5 +208,6 @@ $<HTMLInputElement>("#importFile").addEventListener("change", async e => {
       $<HTMLSelectElement>("#scaling").value = saved.display?.scaling ?? "stretched"; }
   } catch { /* storage unavailable: app still works, nothing persists */ }
   updateCalc();
+  if (await sensLockedNow()) $("#lockNote").hidden = false;
   try { await refreshHistory(); } catch { $("#histNote").textContent = "Saved sessions are unavailable in this browser."; }
 })();

@@ -3,6 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import type { DashboardData, SensPoint, TrendSeries } from "../analysis/dashboard";
 import type { Finding } from "../analysis/fingerprint";
 import { fmt } from "../core/math";
+import { CoachPanel, type CoachProps } from "./coachPanel";
 
 const day = (iso: string) => new Date(iso).toLocaleDateString();
 const src = (ids: string[], at?: string) => `Source: ${at ? day(at) + " · " : ""}${ids.join(", ")}`;
@@ -79,7 +80,7 @@ function Trend({ t }: { t: TrendSeries }) {
   );
 }
 
-function Dashboard({ d, dpi, onExport }: { d: DashboardData; dpi: number; onExport: () => void }) {
+function Dashboard({ d, dpi, onExport, coach }: { d: DashboardData; dpi: number; onExport: () => void; coach: CoachProps }) {
   const skill = d.trends.filter(t => t.key.startsWith("skill:") || t.key === "battery:combined");
   return (
     <>
@@ -94,6 +95,7 @@ function Dashboard({ d, dpi, onExport }: { d: DashboardData; dpi: number; onExpo
           : d.findings.length ? d.findings.map(f => <FindingCard key={f.key} f={f} />)
           : <p className="note">No finding exceeds your noise floor in two or more sessions. That means nothing stands out yet, not that nothing could be improved.</p>}
       </Panel>
+      <CoachPanel {...coach} />
       <Panel title="Sensitivity history"><SensHistory sens={d.sens} dpi={dpi} /></Panel>
       <Panel title="Skill trends" tag="battery scores · band = baseline mean ± SDC95">
         {skill.length ? <div className="grid2">{skill.map(t => <Trend key={t.key} t={t} />)}</div> : <p className="note">No battery sessions yet.</p>}
@@ -111,7 +113,7 @@ function Dashboard({ d, dpi, onExport }: { d: DashboardData; dpi: number; onExpo
 }
 
 let root: Root | null = null;
-export function renderDashboard(el: HTMLElement, d: DashboardData, dpi: number, onExport: () => void): void {
+export function renderDashboard(el: HTMLElement, d: DashboardData, dpi: number, onExport: () => void, coach: CoachProps): void {
   if (!root) root = createRoot(el);
-  root.render(<Dashboard d={d} dpi={dpi} onExport={onExport} />);
+  root.render(<Dashboard d={d} dpi={dpi} onExport={onExport} coach={coach} />);
 }

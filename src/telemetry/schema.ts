@@ -148,6 +148,7 @@ export interface ExportFile {
   sessions: SessionLog[];
   calibrations?: CalibrationRecord[];
   external?: ExternalResult[];
+  experiments?: import("../analysis/experiments").Experiment[];
 }
 
 const isNum = (v: unknown): v is number => typeof v === "number" && isFinite(v);

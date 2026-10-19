@@ -55,10 +55,6 @@ export function resultsHTML(s: SessionLog, r: SessionResult, prevCm: number | nu
     <section class="panel"><h2 style="font-size:18px">Best sens by range</h2><div class="ranges">${(["pb", "close", "mid", "duo"] as RangeId[]).map(rg).join("")}</div><p class="note">Each range fitted on its own. When these split apart, your overall sens is the weighted compromise: close range and the 2v1 count for 80% of the score because that's where SMG fights are decided.</p></section>
     <section class="panel"><h2 style="font-size:18px">What your mouse data shows</h2><ul class="insights">${r.insights.map(([k, t]) => `<li><span class="pill ${k}">${k === "fix" ? "Fix" : k === "watch" ? "Watch" : "Solid"}</span><span>${t}</span></li>`).join("")}</ul></section>
     ${m1Section(r)}
-    <section class="panel coach" id="coach"><div class="row" style="justify-content:space-between"><h2 style="font-size:18px">AI tracking coach</h2><span class="tag">Claude</span></div>
-      <p class="note" id="coachNote">Claude reads every metric from every block, range by range, and explains how your tracking changes from fast to slow sens, what's costing you SMG fights, and what to drill.</p>
-      <div class="row"><button class="btn" id="coachBtn" type="button" hidden>Get tracking coaching</button><button class="btn ghost" id="coachStop" type="button" hidden>Stop</button></div>
-      <div id="coachOut"></div></section>
     <section class="panel"><h2 style="font-size:18px">Every block</h2><div class="tablebox"><table><thead><tr><th>Block</th><th>Sens</th><th>cm/360</th><th>Score</th><th>Point-blank</th><th>Close</th><th>Mid</th><th>2v1</th><th>Recover ms</th><th>Wobble °</th><th>Hand cm/s</th></tr></thead><tbody>${tr}</tbody></table></div>
       <p class="note">Blocks in the order you played them. Range columns are time on target. Recover is time to get back on an enemy after they change direction (close duel). Wobble is high-frequency shake near the target. Hand cm/s is your fastest hand movement.</p></section>
     <div class="row"><button class="btn" id="againBtn" type="button">Run the test again</button><button class="btn ghost" id="copyBtn" type="button">Copy report</button><button class="btn ghost" id="setupBtn" type="button">Back to setup</button><span class="note" id="copyNote"></span></div>`;
@@ -68,27 +64,6 @@ export function copyText(s: SessionLog, r: SessionResult): string {
   return `Strafe Lab: ${fmt(r.recSens, 2)} sens at ${s.settings.dpi} DPI (${fmt(r.fit.peakCm, 1)} cm/360), confidence ${r.conf.level}. Current: ${fmt(s.settings.sens, 2)}.\n` + r.insights.map(i => "- " + i[1]).join("\n");
 }
 
-/** JSON handed to the optional AI coach. Every number comes from deterministic analysis of the stored log. */
-export function coachReport(s: SessionLog, r: SessionResult): object {
-  const { dpi, sens, fovScale, display } = s.settings, { fit, conf } = r;
-  const r1 = (o: object) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === "number" ? +v.toFixed(2) : v]));
-  return {
-    setup: { dpi, clFovScale: fovScale, gameAspect: display.aspect, displayScaling: display.scaling, currentSens: sens, currentCm360: +r.baseCm.toFixed(1), rawInput: s.rawInput },
-    result: {
-      recommendedSens: +r.recSens.toFixed(2), recommendedCm360: +fit.peakCm.toFixed(1),
-      sweetSpotSens: fit.curved ? [+r.recLoSens.toFixed(2), +r.recHiSens.toFixed(2)] : null,
-      confidence: conf.level, peakStabilityPlusMinusPct: fit.spread != null ? +fit.spread.toFixed(1) : null,
-      fitRmsePoints: fit.rmse != null ? +fit.rmse.toFixed(1) : null, peakAtEdgeOfTestedRange: fit.edge,
-      bestCm360ByRange: Object.fromEntries(Object.entries(r.per).map(([k, p]) => [k, { cm360: +p.peakCm.toFixed(1), sens: +sensFromCm(p.peakCm, dpi).toFixed(2), atEdge: p.edge }])),
-      fatiguePointsPerBlock: +r.fatigue.toFixed(2),
-    },
-    habitsAveraged: r1(r.habits),
-    blocks: r.scored.map(b => ({
-      playedOrder: b.data.order + 1, round: b.round, sens: +sensFromCm(b.cm, dpi).toFixed(2), cm360: +b.cm.toFixed(1), score: +b.data.score.toFixed(1),
-      pointBlank: r1(b.data.pb), closeDuel: r1(b.data.close), midRange: r1(b.data.mid), twoVsOne: r1(b.data.duo),
-    })),
-  };
-}
 
 const M1_ROWS: [keyof NonNullable<SessionResult["m1"]>["pb"], string, number, string][] = [
   ["onPct", "Time on target", 0, "%"], ["headPct", "Head time", 0, "%"],
