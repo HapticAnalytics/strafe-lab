@@ -1,0 +1,52 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden: synthetic lag-0.08 player, 144 fps > block metrics are locked 1`] = `
+{
+  "close": {
+    "behind": 100,
+    "handPeak": 3.134,
+    "handTravel": 15.711,
+    "head": 0,
+    "jitter": 0.059,
+    "left": 43.129,
+    "on": 48.785,
+    "oscPerSec": 1.917,
+    "pitchErr": 0,
+    "recover": 364.432,
+    "right": 44.864,
+    "targetSpeed": 23.855,
+    "vertMiss": 0,
+  },
+  "mid": {
+    "behind": 100,
+    "handPeak": 1.399,
+    "handTravel": 6.437,
+    "head": 0,
+    "jitter": 0.018,
+    "left": 42.2,
+    "on": 51.447,
+    "oscPerSec": 1.083,
+    "pitchErr": 0,
+    "recover": 506.41,
+    "right": 33.38,
+    "targetSpeed": 9.769,
+    "vertMiss": 0,
+  },
+  "pb": {
+    "behind": 100,
+    "handPeak": 3.675,
+    "handTravel": 19.483,
+    "head": 0,
+    "jitter": 0.309,
+    "left": 62.866,
+    "on": 66.667,
+    "oscPerSec": 2.9,
+    "pitchErr": 0,
+    "recover": 194.684,
+    "right": 65.759,
+    "targetSpeed": 35.656,
+    "vertMiss": 0,
+  },
+  "score": 41.591,
+}
+`;
