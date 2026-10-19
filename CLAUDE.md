@@ -18,7 +18,7 @@ Read ROADMAP.md before any work. Work one milestone at a time and keep the app r
 - FOV: the real config value is `cl_fovScale`; 4:3 horizontal FOV = 70 × cl_fovScale and is NOT capped at the slider max of 110. Slider V is just cl_fovScale = 1+(V−70)·0.01375.
 - Display: the drills must match the player’s real view, so settings carry cl_fovScale, game aspect (native, 4:3, 5:4, 16:10, 16:9) and scaling (stretched to fill the monitor, or black bars). Display never changes sens math or any metric (all angular).
 - Movement: walk 5.07, sprint 7.59, crouch-walk 2.34 m/s; −13% holding a weapon.
-- R-99: 11/17 damage, 1080 RPM.
+- R-99: 11/17 damage, 1080 RPM, as verified for the brief. The Aug 3 2026 "Marked" patch (Season 30) made body damage 12 (EA patch notes). The 2v1 drill keeps 11/17 as a frozen ruleset so stored sessions replay identically. Weapon sims (sim/weapons.ts) use dated, sourced profiles. Never change a constant that replays stored logs without versioning it.
 
 Known V2 limitations to fix in v3: per-frame sampling and hit tests, single seed per drill, no uncertainty interval, hipfire only.
 

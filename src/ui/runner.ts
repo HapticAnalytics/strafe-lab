@@ -14,6 +14,8 @@ import { nextLevel, paramsFor, type Levels, type NemesisParams } from "../sim/ne
 import { TRAIN_ACC_S, TRAIN_SEG_S, trainingOrder, trainingSeed, type TrainMode } from "../sim/training";
 import { scoreNemesis } from "../analysis/training";
 import { mulberry32 } from "../core/rng";
+import { CombatSim, combatParams, COMBAT_SCENARIOS, type CombatScenarioId, type FireMode } from "../sim/combat";
+import { WEAPONS } from "../sim/weapons";
 import { buildScenario, hitAt, targetView, type Scenario } from "../sim/scenario";
 import { BlockRecorder } from "../telemetry/recorder";
 import { SCHEMA_VERSION, type Settings, type SessionLog } from "../telemetry/schema";
@@ -56,6 +58,9 @@ export class Runner {
   /** training: current Nemesis level per family (updated after every segment by the staircase) */
   private levels: Levels | null = null;
   private segParams: NemesisParams | null = null;
+  /** combat: live weapon layer fed with the evaluator's samples (display only; results come from the log) */
+  private combat: CombatSim | null = null;
+  private combatFed = 0;
 
   constructor(private scene: RangeScene, private mouse: MouseInput, private hooks: RunnerHooks) {
     $("#ovGo").addEventListener("click", () => { if (!this.mouse.locked) this.mouse.lock(); else this.startBlock(); });
@@ -127,6 +132,29 @@ export class Runner {
     this.open(settings);
   }
 
+  /** Milestone 8 combat lab: one weapon scenario at the player's own sens, hipfire or ADS. */
+  startCombat(settings: Settings, scenario: CombatScenarioId, mode: FireMode): void {
+    const cm = cmPer360(settings.sens, settings.dpi);
+    const rnd = () => crypto.getRandomValues(new Uint32Array(1))[0];
+    const def = COMBAT_SCENARIOS[scenario], w = WEAPONS[def.weapon];
+    this.plan = [{
+      cm, phase: "sweep" as const, warm: false,
+      acc: { id: "acc", seed: trainingSeed(rnd), dur: 4 },
+      // APPROX: 20 s per combat drill
+      segments: [{ id: "nem" as const, seed: trainingSeed(rnd), dur: 20, combat: { scenario, weapon: w.id, version: w.version, mode } }],
+    }];
+    this.levels = null;
+    this.totalPlanned = 1;
+    this.zoomPlanned = true;
+    this.bi = 0;
+    this.session = {
+      schema: SCHEMA_VERSION, id: crypto.randomUUID(), startedAt: new Date().toISOString(), finishedAt: null,
+      status: "in_progress", settings, rawInput: false, sampling: "event", capture: this.mouse.diag,
+      protocol: "combat", blocks: [],
+    };
+    this.open(settings);
+  }
+
   private open(settings: Settings): void {
     this.scene.setView(settings.fovScale, settings.display);
     $("#setup").hidden = true; $("#results").hidden = true; $("#baseline").hidden = true; $("#range").hidden = false;
@@ -141,11 +169,14 @@ export class Runner {
     const b = this.plan[this.bi];
     this.scene.hideEnemies(); $("#hpbars").hidden = true; $("#banner").hidden = true;
     const n = this.bi + 1;
-    const battery = this.session.protocol === "battery" || this.session.protocol === "train";
+    const battery = this.session.protocol === "battery" || this.session.protocol === "train" || this.session.protocol === "combat";
+    const combatSeg = b.segments[0]?.combat;
     const train = this.session.protocol === "train";
-    $("#ovEyebrow").textContent = train ? `Training · block ${n} of ${this.totalPlanned} · ${this.session.trainMode} practice` : battery ? `Baseline battery · round ${n} of ${this.totalPlanned} · your own sens` : b.warm ? "Warm-up · not scored" : `Block ${n} of ${this.totalPlanned} · ${b.phase === "zoom" ? "zoom" : "sweep"} · sensitivity hidden`;
-    $("#ovTitle").textContent = train ? (n === 1 ? "Nemesis training" : "Next block") : battery ? (n === 1 ? "Baseline battery" : "Round two") : b.warm ? "Get your hand moving" : b.phase === "zoom" ? "Zooming in" : "Next block";
-    $("#ovText").textContent = train
+    $("#ovEyebrow").textContent = combatSeg ? `Combat lab · ${WEAPONS[combatSeg.weapon].name} · ${combatSeg.mode === "ads" ? "ADS" : "hipfire"}` : train ? `Training · block ${n} of ${this.totalPlanned} · ${this.session.trainMode} practice` : battery ? `Baseline battery · round ${n} of ${this.totalPlanned} · your own sens` : b.warm ? "Warm-up · not scored" : `Block ${n} of ${this.totalPlanned} · ${b.phase === "zoom" ? "zoom" : "sweep"} · sensitivity hidden`;
+    $("#ovTitle").textContent = combatSeg ? COMBAT_SCENARIOS[combatSeg.scenario].name : train ? (n === 1 ? "Nemesis training" : "Next block") : battery ? (n === 1 ? "Baseline battery" : "Round two") : b.warm ? "Get your hand moving" : b.phase === "zoom" ? "Zooming in" : "Next block";
+    $("#ovText").textContent = combatSeg
+      ? "Hold or click the left button to fire. Damage, magazine and reload follow the weapon's published stats; recoil and spread are approximations. Your mouse-control scores are measured separately and don't depend on the weapon."
+      : train
       ? "Scenarios adapt to keep you at about 55-75% success: they get harder when you do well and easier when you struggle. Fresh scenarios every time."
       : battery
       ? "Same fixed drills as every battery, at your normal sens. Play it like a real fight; this measures your day-to-day noise floor."
@@ -187,7 +218,7 @@ export class Runner {
     this.k = radPerCount(b.cm, this.session.settings.dpi);
     this.session.rawInput = this.mouse.rawInput;
     $("#overlay").hidden = true;
-    const round = b.warm || this.session.protocol === "battery" || this.session.protocol === "train" ? null : b.phase === "zoom" ? 2 : 1;
+    const round = b.warm || this.session.protocol === "battery" || this.session.protocol === "train" || this.session.protocol === "combat" ? null : b.phase === "zoom" ? 2 : 1;
     this.B = { steps: [b.acc, ...b.segments], step: -1, inGap: false, t0: 0, gapUntil: 0, seg: null, sc: null, ev: null, rec: new BlockRecorder(this.bi, b.warm, round, b.cm) };
     this.live = true; this.phase = "live";
     this.nextStep(performance.now());
@@ -224,10 +255,12 @@ export class Runner {
     ban.hidden = true;
     const seg = B.steps[B.step];
     B.seg = seg; B.t0 = now;
-    this.segParams = seg.family && this.levels ? paramsFor(seg.family, this.levels[seg.family]) : null;
+    this.segParams = seg.combat ? combatParams(seg.combat.scenario) : seg.family && this.levels ? paramsFor(seg.family, this.levels[seg.family]) : null;
     B.sc = buildScenario(seg.id, seg.seed, seg.dur, this.segParams ?? undefined);
-    B.ev = new DrillEvaluator(B.sc, this.k, false);
-    B.rec.startDrill(seg.id, seg.seed, seg.dur, this.k, this.segParams ?? undefined);
+    B.ev = new DrillEvaluator(B.sc, this.k, !!seg.combat);
+    this.combat = seg.combat ? new CombatSim(B.sc, seg.combat, seg.seed) : null;
+    this.combatFed = 0;
+    B.rec.startDrill(seg.id, seg.seed, seg.dur, this.k, this.segParams ?? undefined, seg.combat);
     this.mouse.begin(now, this.k);
     if (B.sc.damage) { $("#hpbars").hidden = false; $("#hp0").style.width = "100%"; $("#hp1").style.width = "100%"; }
   }
@@ -241,6 +274,7 @@ export class Runner {
     B.rec.events(fresh);
     this.mouse.diag.late += ev.push(fresh);
     ev.advanceTo(el - LIVE_LAG);
+    if (this.combat) { this.combat.push(ev.samples.slice(this.combatFed)); this.combatFed = ev.samples.length; }
     const { yaw, pitch } = this.mouse.aim;
     let on = 0;
     if (sc.spawn) {
@@ -266,7 +300,8 @@ export class Runner {
     if (sc.damage) [0, 1].forEach(i => ($("#hp" + i).style.width = `${clamp(ev.hp[i] / sc.damage!.hp, 0, 1) * 100}%`));
     this.updateOnBar(on);
     const left = sc.damage ? ev.hp.filter(h => h > 0).length : 0;
-    const done = sc.spawn ? ` · ${ev.spawns.filter(s => s.done != null).length} hit` : "";
+    const cr = this.combat?.result();
+    const done = sc.spawn ? ` · ${ev.spawns.filter(s => s.done != null).length} hit` : cr ? ` · ammo ${this.combat!.reloading ? "reloading" : this.combat!.ammo} · ${Math.round(cr.damage)} dmg · ${cr.kills} kills` : "";
     $("#hudTimer").textContent = `${Math.max(0, B.seg!.dur - el).toFixed(1)} s${sc.damage ? ` · ${2 - left}/2 down` : ""}${done}`;
     if (el >= B.seg!.dur || ev.done) this.nextStep(now);
   }

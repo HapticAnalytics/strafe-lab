@@ -22,6 +22,8 @@ import { batterySessions } from "./analysis/baseline";
 import { buildContext } from "./coach/facts";
 import { levelsFrom, trainSessions } from "./analysis/training";
 import type { TrainMode } from "./sim/training";
+import { COMBAT_SCENARIOS, type CombatScenarioId, type FireMode } from "./sim/combat";
+import { combatResultsHTML } from "./ui/combatResults";
 import { batteryMetrics } from "./analysis/battery";
 import { computeV3, type V3Result } from "./analysis/result3";
 import { resultsV3HTML } from "./ui/results3";
@@ -75,6 +77,7 @@ function summary(s: SessionLog): string | null {
   if (s.status !== "complete") return null;
   if (s.protocol === "battery") return `battery combined ${fmt(batteryMetrics(s)[0]?.value, 1)}`;
   if (s.protocol === "train") return `${s.trainMode} training`;
+  if (s.protocol === "combat") return "combat drill";
   if (s.protocol === "v3") {
     const r = v3Of(s);
     if (!r.overall || !r.rec) return null;
@@ -93,7 +96,7 @@ async function refreshHistory(): Promise<SessionLog[]> {
   $("#histList").innerHTML = all.length
     ? [...all].reverse().map(s => {
         const res = summary(s);
-        const label = `${new Date(s.startedAt).toLocaleString()} · ${s.protocol === "v3" ? MODES[s.mode ?? "standard"].label : s.protocol === "battery" ? "Baseline battery" : s.protocol === "train" ? "Training" : "classic"} · ${s.status.replace("_", " ")} · ${s.blocks.length} blocks`;
+        const label = `${new Date(s.startedAt).toLocaleString()} · ${s.protocol === "v3" ? MODES[s.mode ?? "standard"].label : s.protocol === "battery" ? "Baseline battery" : s.protocol === "train" ? "Training" : s.protocol === "combat" ? "Combat lab" : "classic"} · ${s.status.replace("_", " ")} · ${s.blocks.length} blocks`;
         const rp = s.sampling === "event" && s.blocks.length ? `<button class="btn ghost" data-replay="${s.id}" type="button" style="padding:6px 12px">Replay</button>` : "";
         return `<li style="grid-template-columns:1fr auto"><span>${label}${res ? ` · ${res}` : ""}</span><span class="row" style="gap:6px">${res ? `<button class="btn ghost" data-open="${s.id}" type="button" style="padding:6px 12px">Open</button>` : ""}${rp}</span></li>`;
       }).join("")
@@ -107,6 +110,7 @@ function showResults(s: SessionLog, all: SessionLog[]): void {
   const box = $("#results");
   if (s.protocol === "battery") { baseline.open(); return; }
   if (s.protocol === "train") { openDashboard(); return; }
+  if (s.protocol === "combat") { showCombat(s); return; }
   if (s.protocol === "v3") {
     box.innerHTML = resultsV3HTML(s, v3Of(s));
     $("#setup").hidden = true; box.hidden = false; scrollTo(0, 0);
@@ -135,6 +139,7 @@ function ensureRunner(): Runner {
         const all = await refreshHistory();
         if (s.protocol === "battery") await baseline.open();
         else if (s.protocol === "train") await openDashboard();
+        else if (s.protocol === "combat") showCombat(s);
         else showResults(s, all);
       },
       quit: () => { refreshHistory(); },
@@ -145,6 +150,15 @@ function ensureRunner(): Runner {
 
 /** ROADMAP Milestone 6 rule: no sens changes during a training block (an active experiment). */
 async function sensLockedNow(): Promise<boolean> { try { return sensLocked(await listExperiments(db)); } catch { return false; } }
+
+function showCombat(s: SessionLog): void {
+  const box = $("#results");
+  box.innerHTML = combatResultsHTML(s);
+  document.querySelectorAll<HTMLElement>(".wrap").forEach(w => (w.hidden = true));
+  box.hidden = false; scrollTo(0, 0);
+  $("#againBtn").onclick = () => $("#cmbBtn").click();
+  $("#setupBtn").onclick = () => { box.hidden = true; $("#setup").hidden = false; refreshHistory(); scrollTo(0, 0); };
+}
 
 async function startTest(): Promise<void> {
   if (await sensLockedNow() && !confirm("An experiment is active, so your sens is locked. A sens test now would mix sens changes into the experiment. Run it anyway?")) return;
@@ -184,6 +198,12 @@ async function openDashboard(): Promise<void> {
   renderDashboard($("#dashRoot"), d, readSettings().dpi, () => { exportJson(); }, { d, ctx, experiments: results, saveExperiment: e => saveExperiment(db, e), refresh: () => { openDashboard(); } });
 }
 $("#dashOpen").addEventListener("click", () => { scrollTo(0, 0); openDashboard(); });
+(Object.keys(COMBAT_SCENARIOS) as CombatScenarioId[]).forEach(k => $<HTMLSelectElement>("#cmbScenario").add(new Option(COMBAT_SCENARIOS[k].name, k)));
+$("#cmbBtn").addEventListener("click", () => {
+  const settings = readSettings();
+  saveSettings(db, settings).catch(() => {});
+  ensureRunner().startCombat(settings, $<HTMLSelectElement>("#cmbScenario").value as CombatScenarioId, $<HTMLSelectElement>("#cmbMode").value as FireMode);
+});
 $("#trainBtn").addEventListener("click", async () => {
   const settings = readSettings();
   saveSettings(db, settings).catch(() => {});

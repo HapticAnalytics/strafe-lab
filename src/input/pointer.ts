@@ -46,7 +46,12 @@ export class MouseInput {
     document.addEventListener(this.source === "synthetic" ? "mousemove" : this.source, handler);
     document.addEventListener("mousedown", e => {
       if (!this.locked || !this.accepting || e.button !== 0) return;
-      const s = ingestClick(this.buf, e.timeStamp);
+      const s = ingestClick(this.buf, e.timeStamp, 1);
+      if (s) this.pending.push(s);
+    });
+    document.addEventListener("mouseup", e => {
+      if (!this.locked || !this.accepting || e.button !== 0) return;
+      const s = ingestClick(this.buf, e.timeStamp, -1);
       if (s) this.pending.push(s);
     });
     document.addEventListener("pointerlockchange", () => {

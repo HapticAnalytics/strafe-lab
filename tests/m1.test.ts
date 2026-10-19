@@ -186,7 +186,7 @@ describe("M1 metrics: known answers", () => {
     expect(m.errVDeg).toBeCloseTo(0.5, 1);
   });
   it("hand speed: constant 1000 counts/s at 800 DPI = 3.175 cm/s", () => {
-    const S = Array.from({ length: 4000 }, (_, i) => ({ t: i / 1000, yaw: 0, pitch: 0, ty: 0, tp: 0, hw: 0.05, vh: 0.1, on: 1 as const, target: 0, c: i }));
+    const S = Array.from({ length: 4000 }, (_, i) => ({ t: i / 1000, yaw: 0, pitch: 0, ty: 0, tp: 0, hw: 0.05, vh: 0.1, on: 1 as const, target: 0, c: i, trig: 0 as const, press: 0 }));
     const m = computeM1(S, 800);
     expect(m.handSpeedMean).toBeCloseTo(3.175, 1);
     expect(m.handSpeedPeak).toBeCloseTo(3.175, 6);
@@ -194,7 +194,7 @@ describe("M1 metrics: known answers", () => {
     expect(m.windowSdPct).toBe(0);
   });
   it("left/right asymmetry: a target moving one way only has no value for the other side", () => {
-    const S = Array.from({ length: 1000 }, (_, i) => ({ t: i / 1000, yaw: 0, pitch: 0, ty: (i / 1000) * 25 * DEG, tp: 0, hw: 0.05, vh: 0.1, on: 0 as const, target: 0, c: 0 }));
+    const S = Array.from({ length: 1000 }, (_, i) => ({ t: i / 1000, yaw: 0, pitch: 0, ty: (i / 1000) * 25 * DEG, tp: 0, hw: 0.05, vh: 0.1, on: 0 as const, target: 0, c: 0, trig: 0 as const, press: 0 }));
     const m = computeM1(S, 800);
     expect(m.leftOnPct).toBe(0);
     expect(m.rightOnPct).toBeNull();

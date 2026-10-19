@@ -48,10 +48,10 @@ export class CaptureBuffer {
   }
 }
 
-/** Log a left-button press (dx = dy = 0, b = 1) on the same clock. */
-export function ingestClick(buf: CaptureBuffer, timeStamp: number): InputSample | null {
+/** Log a left-button press (b = 1) or release (b = -1) on the same clock; dx = dy = 0. */
+export function ingestClick(buf: CaptureBuffer, timeStamp: number, b: 1 | -1 = 1): InputSample | null {
   if (timeStamp < buf.t0) return null;
-  const s: InputSample = { t: (timeStamp - buf.t0) / 1000, dx: 0, dy: 0, b: 1 };
+  const s: InputSample = { t: (timeStamp - buf.t0) / 1000, dx: 0, dy: 0, b };
   buf.samples.push(s);
   return s;
 }

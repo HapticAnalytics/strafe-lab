@@ -88,3 +88,32 @@ test("a training block runs Nemesis segments and is saved with their parameters"
   expect(saved).toEqual({ protocol: "train", segs: 5, withParams: 5 });
   expect(errors).toEqual([]);
 });
+
+test("combat lab: an R-99 drill with the trigger held shows weapon results and mouse control separately", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto("/");
+  await page.selectOption("#cmbScenario", "smg");
+  await page.selectOption("#cmbMode", "ads");
+  await page.click("#cmbBtn");
+  await page.click("#ovGo");
+  await page.waitForTimeout(500);
+  test.skip(!(await page.evaluate(() => !!document.pointerLockElement)), "pointer lock not available");
+  await expect(page.locator("#ovEyebrow")).toContainText("Combat lab · R-99 · ADS");
+  await page.waitForTimeout(700);
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(5500); // acclimation + gap
+  await page.mouse.down();
+  let i = 0;
+  while (await page.locator("#range").isVisible()) {
+    await page.mouse.move(400 + 120 * Math.sin(i / 9), 300 + 30 * Math.cos(i / 13));
+    await page.waitForTimeout(10);
+    i++;
+  }
+  await page.mouse.up();
+  await expect(page.locator("#results")).toContainText("Weapon result");
+  await expect(page.locator("#results")).toContainText("Mouse control (independent of the weapon)");
+  await expect(page.locator("#results")).toContainText("reloads");
+  expect(errors).toEqual([]);
+});

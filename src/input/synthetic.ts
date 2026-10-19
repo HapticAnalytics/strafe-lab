@@ -46,8 +46,8 @@ export function synthPlayerEvents(sc: Scenario, k: number, p: PlayerModel, pollH
       if (!a || a.local < p.lag) continue;
       tv = targetView(sc, a.i, a.local);
       if (sc.spawn.def.complete === "click" && t - lastClick > 0.1 && hitAt(targetView(sc, a.i, a.local), aim.yaw, aim.pitch)) {
-        const c = { t, dx: 0, dy: 0, b: 1 as const };
-        out.push(c); ev.push([c]); lastClick = t;
+        const c = { t, dx: 0, dy: 0, b: 1 as const }, u = { t, dx: 0, dy: 0, b: -1 as const };
+        out.push(c, u); ev.push([c, u]); lastClick = t;
         continue;
       }
     } else {

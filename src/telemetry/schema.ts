@@ -39,9 +39,9 @@ export interface FrameDrillLog {
 
 /**
  * One raw mouse event. t: seconds since drill start (from the event's own timestamp). dx/dy: counts.
- * b: 1 = left button pressed at t (dx = dy = 0). Optional, so Milestone 1 logs stay valid.
+ * b: 1 = left button pressed at t, -1 = released (dx = dy = 0). Optional, so Milestone 1 logs stay valid.
  */
-export interface InputSample { t: number; dx: number; dy: number; b?: 1 }
+export interface InputSample { t: number; dx: number; dy: number; b?: 1 | -1 }
 
 export interface EventDrillLog {
   id: DrillId;
@@ -55,6 +55,8 @@ export interface EventDrillLog {
   events: InputSample[];
   /** Nemesis segments (Milestone 7): the generated scenario parameters, required to replay */
   params?: import("../sim/nemesis").NemesisParams;
+  /** combat segments (Milestone 8): weapon layer applied on top of the same samples; never affects mechanics */
+  combat?: import("../sim/combat").CombatSpec;
 }
 
 export type DrillLog = FrameDrillLog | EventDrillLog;
@@ -105,7 +107,7 @@ export interface SessionLog {
   capture?: CaptureDiagnostics;
   /** "v3" = Sensitivity Intelligence v3 (Milestone 2); "battery" = fixed baseline battery (Milestone 3);
    *  "train" = training session (Milestone 7). Absent = the V2 classic protocol. */
-  protocol?: "v3" | "battery" | "train";
+  protocol?: "v3" | "battery" | "train" | "combat";
   /** battery: which fixed held-out seed set was used */
   seedSet?: number;
   /** training (Milestone 7): practice order */
@@ -179,7 +181,7 @@ export function sessionProblem(s: unknown): string | null {
         }
       } else {
         if (!Array.isArray(d.events) || !isNum(d.k) || !isNum(d.dur) || !isNum(d.tEnd) || !isNum(d.seed)) return "bad drill";
-        for (const e of d.events as unknown[]) if (!isObj(e) || !isNum(e.t) || !isNum(e.dx) || !isNum(e.dy) || (e.b !== undefined && e.b !== 1)) return "bad event";
+        for (const e of d.events as unknown[]) if (!isObj(e) || !isNum(e.t) || !isNum(e.dx) || !isNum(e.dy) || (e.b !== undefined && e.b !== 1 && e.b !== -1)) return "bad event";
       }
     }
   }

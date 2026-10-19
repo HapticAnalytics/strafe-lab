@@ -10,7 +10,10 @@ import { profileOf, type NemesisParams } from "./nemesis";
 
 
 /** size: hitbox width scale (Nemesis); 1 = the standard hitbox */
-export interface Lane { theta: number; dist: number; size?: number }
+export interface Lane { theta: number; dist: number; size?: number; distOsc?: { amp: number; period: number } }
+
+/** Lane distance at time t (constant unless the lane closes/opens range). */
+export const laneDist = (lane: Lane, t: number): number => (lane.distOsc ? lane.dist + lane.distOsc.amp * Math.sin((2 * Math.PI * t) / lane.distOsc.period) : lane.dist);
 
 export interface SpawnTarget extends Lane { traj: Trajectory | null }
 
@@ -40,7 +43,7 @@ export function buildScenario(id: DrillId, seed: number, dur: number, params?: N
       return { id, seed, dur, lanes, traj, damage: { body: DPS_BODY, head: DPS_HEAD, hp: HP }, spawn: null };
     }
     const traj = buildTrajectories([{ profile: prof, x0: 0 }], seed, dur);
-    return { id, seed, dur, lanes: [{ theta: 0, dist: params.dist, size: params.size }], traj, damage: null, spawn: null };
+    return { id, seed, dur, lanes: [{ theta: 0, dist: params.dist, size: params.size, ...(params.distOsc ? { distOsc: params.distOsc } : {}) }], traj, damage: null, spawn: null };
   }
   if (id === "duo") {
     const traj = buildTrajectories(DUO_ENEMIES.map(e => ({ profile: DUO_PROFILE, x0: e.x0 })), seed, dur);
@@ -71,10 +74,10 @@ export function enemyState(sc: Scenario, i: number, t: number): EnemyState {
   return sampleTrajectory(sc.traj[i], t);
 }
 
-/** World position of the enemy's feet. */
-export function feetPos(lane: Lane, s: EnemyState): Vec3 {
+/** World position of the enemy's feet (dist: the lane distance at that moment). */
+export function feetPos(lane: Lane, s: EnemyState, dist = lane.dist): Vec3 {
   const fx = -Math.sin(lane.theta), fz = -Math.cos(lane.theta), rx = Math.cos(lane.theta), rz = -Math.sin(lane.theta);
-  return { x: fx * lane.dist + rx * s.x, y: s.y, z: fz * lane.dist + rz * s.x };
+  return { x: fx * dist + rx * s.x, y: s.y, z: fz * dist + rz * s.x };
 }
 
 export interface TargetView {
@@ -87,7 +90,8 @@ export interface TargetView {
 
 export function targetView(sc: Scenario, i: number, t: number): TargetView {
   const s = enemyState(sc, i, t), lane = sc.lanes[i];
-  const c = enemyChest(s, lane.theta, lane.dist), a = angTo(c), feet = feetPos(lane, s);
+  const dist = laneDist(lane, t);
+  const c = enemyChest(s, lane.theta, dist), a = angTo(c), feet = feetPos(lane, s, dist);
   const dh = Math.hypot(c.x, c.z);
   const top = Math.atan2(feet.y + BODY_HEIGHT * s.h - EYE, dh), bottom = Math.atan2(feet.y - EYE, dh);
   const size = lane.size ?? 1;

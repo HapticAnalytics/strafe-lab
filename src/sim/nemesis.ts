@@ -22,6 +22,8 @@ export interface NemesisParams {
   /** hitbox width scale */
   size: number;
   targets: 1 | 2;
+  /** optional range change: distance = dist + amp * sin(2 pi t / period) (combat scenarios) */
+  distOsc?: { amp: number; period: number };
 }
 
 interface Anchor { dist: number; speedScale: number; accel: number; sub: [number, number]; jitter: number; mix: Mix; bound: number; size: number }

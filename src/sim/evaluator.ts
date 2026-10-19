@@ -20,6 +20,9 @@ export interface Sample {
   target: number;
   /** cumulative |delta| in counts (hand travel) */
   c: number;
+  /** trigger (left button) held at this tick, and presses that happened during it */
+  trig: 0 | 1;
+  press: number;
 }
 
 export interface Kill { i: number; t: number }
@@ -47,6 +50,8 @@ export class DrillEvaluator {
   dmgHead = 0;
   counts = 0;
   clicks = 0;
+  trig: 0 | 1 = 0;
+  private pressesNow = 0;
   /** next grid tick index to evaluate */
   private tick = 0;
   private events: InputSample[] = [];
@@ -88,7 +93,7 @@ export class DrillEvaluator {
     const sp = this.sc.spawn!;
     if (t < this.sAt) {
       // between targets: keep the 1 kHz sample grid uniform (aim only; nothing to hit)
-      if (this.keepSamples) { const tv = targetView(this.sc, this.si, 0); this.samples.push({ t, yaw: this.aim.yaw, pitch: this.aim.pitch, ty: tv.yaw, tp: tv.pitch, hw: tv.hw, vh: tv.vh, on: 0, target: -1, c: this.counts }); }
+      if (this.keepSamples) { const tv = targetView(this.sc, this.si, 0); this.samples.push({ t, yaw: this.aim.yaw, pitch: this.aim.pitch, ty: tv.yaw, tp: tv.pitch, hw: tv.hw, vh: tv.vh, on: 0, target: -1, c: this.counts, trig: this.trig, press: this.pressesNow }); }
       return;
     }
     const i = this.si, local = t - this.sAt;
@@ -108,7 +113,7 @@ export class DrillEvaluator {
     } else {
       for (const hitKind of clicksNow) { if (hitKind) { complete = true; break; } rec.misses++; }
     }
-    if (this.keepSamples) this.samples.push({ t, yaw: this.aim.yaw, pitch: this.aim.pitch, ty: tv.yaw, tp: tv.pitch, hw: tv.hw, vh: tv.vh, on, target: i, c: this.counts });
+    if (this.keepSamples) this.samples.push({ t, yaw: this.aim.yaw, pitch: this.aim.pitch, ty: tv.yaw, tp: tv.pitch, hw: tv.hw, vh: tv.vh, on, target: i, c: this.counts, trig: this.trig, press: this.pressesNow });
     if (complete) rec.done = t;
     if (complete || local >= sp.def.timeout - 1e-9) {
       this.si = Math.min(sp.targets.length - 1, this.si + 1);
@@ -128,8 +133,9 @@ export class DrillEvaluator {
       const clicksNow: number[] = [];
       while (this.ei < this.events.length && this.events[this.ei].t <= t + 1e-12) {
         const e = this.events[this.ei++];
+        if (e.b === -1) { this.trig = 0; continue; }
         if (e.b) {
-          this.clicks++;
+          this.clicks++; this.trig = 1; this.pressesNow++;
           const a = this.activeSpawn(t);
           if (a) clicksNow.push(hitAt(targetView(sc, a.i, a.local), this.aim.yaw, this.aim.pitch));
           continue;
@@ -137,7 +143,7 @@ export class DrillEvaluator {
         applyDelta(this.aim, e.dx, e.dy, this.k);
         this.counts += Math.hypot(e.dx, e.dy);
       }
-      if (sc.spawn) { this.spawnTick(t, clicksNow); this.tick++; continue; }
+      if (sc.spawn) { this.spawnTick(t, clicksNow); this.pressesNow = 0; this.tick++; continue; }
       const { yaw, pitch } = this.aim;
       let on: 0 | 1 | 2 = 0, hitI = -1, best = Infinity, target = -1;
       let tv0 = null as ReturnType<typeof targetView> | null;
@@ -150,7 +156,7 @@ export class DrillEvaluator {
         if (dd < best) { best = dd; target = i; tv0 = tv; }
       }
       if (tv0 && this.keepSamples) {
-        this.samples.push({ t, yaw, pitch, ty: tv0.yaw, tp: tv0.pitch, hw: tv0.hw, vh: tv0.vh, on, target, c: this.counts });
+        this.samples.push({ t, yaw, pitch, ty: tv0.yaw, tp: tv0.pitch, hw: tv0.hw, vh: tv0.vh, on, target, c: this.counts, trig: this.trig, press: this.pressesNow });
       }
       // damage is applied over [t, t + GRID_DT)
       if (sc.damage && on && hitI >= 0) {
@@ -163,6 +169,7 @@ export class DrillEvaluator {
           if (this.hp.every(h => h <= 0)) { this.endT = Math.min(this.endT, t + GRID_DT); }
         }
       }
+      this.pressesNow = 0;
       this.tick++;
     }
   }

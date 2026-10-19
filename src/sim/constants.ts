@@ -9,7 +9,9 @@ export const WEAPON_SLOWDOWN = 0.87;
 export const WALK_GUN = WALK * WEAPON_SLOWDOWN; // 4.41 m/s
 export const CROUCH_GUN = CROUCH_WALK * WEAPON_SLOWDOWN; // 2.04 m/s
 
-// VERIFIED: liquipedia R-99, 1080 RPM, 11 body / 17 head -> 198 / 306 DPS
+// VERIFIED (frozen ruleset): liquipedia R-99 as of the project brief, 1080 RPM, 11 body / 17 head -> 198 / 306 DPS.
+// The Aug 3 2026 "Marked" patch (Season 30) set R-99 body damage to 12. The 2v1 drill keeps 11/17 on purpose so
+// every stored session replays identically; weapon simulations use the dated profiles in sim/weapons.ts.
 export const DPS_BODY = 198;
 export const DPS_HEAD = 306;
 // VERIFIED: purple shield (100) + base health (100) = 200 effective HP
