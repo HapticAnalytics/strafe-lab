@@ -1,0 +1,898 @@
+<title>Strafe Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-column console. Setup -> full-screen range -> results report. Single dark "range at night" look by choice. */
+:root{
+  --ground:#171c23; --panel:#1f262f; --panel-2:#262e39; --line:#343e4b;
+  --ink:#ece8e1; --muted:#8e98a6; --signal:#ff7a3d; --signal-ink:#1a0f08;
+  --data:#62c6d4; --good:#6fcf8e; --warn:#f2c14e; --bad:#ff5d5d;
+  --f-display:"Chakra Petch", "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--ground);color:var(--ink)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.55;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.wrap{max-width:1000px;margin:0 auto;padding-block:28px 64px;display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;letter-spacing:.01em;text-wrap:balance;margin:0}
+p{margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.brand h1{font-size:34px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.brand h1 span{color:var(--signal)}
+.lede{color:var(--muted);max-width:64ch}
+.grid2{display:grid;grid-template-columns:1.05fr 1fr;gap:20px}
+.grid2>*{min-width:0}
+@media (max-width:820px){.grid2{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.fields{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:520px){.fields{grid-template-columns:1fr 1fr}}
+label{display:flex;flex-direction:column;gap:6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:var(--f-mono)}
+input{background:var(--ground);border:1px solid var(--line);color:var(--ink);font:500 18px var(--f-mono);padding:10px 12px;border-radius:4px;width:100%;box-sizing:border-box;font-variant-numeric:tabular-nums}
+input:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
+.calc{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+.calc b{color:var(--data);font-weight:500}
+.checks{display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--muted);padding:0;margin:0;list-style:none}
+.checks li{display:flex;gap:10px}
+.checks li::before{content:"";flex:0 0 8px;height:8px;margin-top:8px;background:var(--signal);transform:rotate(45deg)}
+.btn{appearance:none;border:0;border-radius:4px;padding:13px 20px;font:600 15px var(--f-display);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;background:var(--signal);color:var(--signal-ink)}
+.btn:hover{filter:brightness(1.08)}
+.btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.note{font-size:13px;color:var(--muted)}
+.warnbox{border:1px solid var(--warn);color:var(--warn);border-radius:4px;padding:10px 12px;font-size:14px}
+.drills{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media (max-width:860px){.drills{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){.drills{grid-template-columns:1fr}}
+.drill{border-top:2px solid var(--signal);background:var(--panel);padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.drill h3{font-size:17px}
+.drill .spec{font:400 12px var(--f-mono);color:var(--data)}
+.drill p{font-size:14px;color:var(--muted)}
+.tag{display:inline-block;font:500 11px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--line);color:var(--muted);padding:2px 8px;border-radius:999px}
+.tag.ex{border-color:var(--warn);color:var(--warn)}
+svg text{font-family:var(--f-mono)}
+.chartbox{overflow-x:auto}
+.chartbox svg{display:block;width:100%;min-width:480px;height:auto}
+
+/* Range (full screen) */
+#range{position:fixed;inset:0;z-index:50;background:#000}
+#view{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hud{position:absolute;inset:0;pointer-events:none;font-family:var(--f-mono);color:#fff;text-shadow:0 1px 2px #000}
+.hud-top{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:18px;right:18px;display:flex;justify-content:space-between;gap:12px;font-size:14px;letter-spacing:.06em}
+.hud-top .drillname{font-family:var(--f-display);font-size:20px;text-transform:uppercase;letter-spacing:.08em}
+.hud-top .hint{color:#cfd6df;font-size:13px}
+.xhair{position:absolute;left:50%;top:50%;width:0;height:0}
+.xhair i{position:absolute;background:#fff;box-shadow:0 0 0 1px #000}
+.xhair i:nth-child(1){left:-1px;top:-10px;width:2px;height:6px}
+.xhair i:nth-child(2){left:-1px;top:4px;width:2px;height:6px}
+.xhair i:nth-child(3){top:-1px;left:-10px;height:2px;width:6px}
+.xhair i:nth-child(4){top:-1px;left:4px;height:2px;width:6px}
+.xhair i:nth-child(5){left:-1px;top:-1px;width:2px;height:2px}
+.hpbars{position:absolute;left:50%;bottom:calc(60px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;gap:18px}
+.hp{width:150px;display:flex;flex-direction:column;gap:4px;font-size:12px}
+.hp .bar{height:8px;background:rgba(255,255,255,.18);border-radius:2px;overflow:hidden}
+.hp .bar b{display:block;height:100%;background:#b07cff;width:100%}
+.ontrack{position:absolute;left:50%;top:calc(50% + 22px);transform:translateX(-50%);width:44px;height:3px;background:rgba(255,255,255,.18);border-radius:2px;overflow:hidden}
+.ontrack b{display:block;height:100%;width:0;background:var(--signal)}
+.banner{position:absolute;left:50%;top:30%;transform:translateX(-50%);font-family:var(--f-display);font-size:28px;text-transform:uppercase;letter-spacing:.12em;text-align:center;width:min(90vw,640px)}
+.banner small{display:block;font-family:var(--f-mono);font-size:13px;letter-spacing:.04em;text-transform:none;color:#cfd6df;margin-top:6px}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,13,17,.78);padding:24px;pointer-events:auto}
+.card{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--signal);border-radius:6px;max-width:540px;width:100%;padding:24px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box}
+.card h2{font-size:26px;text-transform:uppercase;letter-spacing:.05em}
+.card .meta{font-family:var(--f-mono);color:var(--data);font-size:13px}
+.progress{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.progress b{display:block;height:100%;background:var(--signal)}
+
+/* Results */
+.hero{display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:end}
+@media (max-width:640px){.hero{grid-template-columns:1fr}}
+.bignum{font-family:var(--f-display);font-weight:700;font-size:76px;line-height:.9;color:var(--signal);font-variant-numeric:tabular-nums}
+.bignum small{font-size:20px;color:var(--muted);font-weight:500;margin-left:6px}
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:640px){.facts{grid-template-columns:1fr 1fr}}
+.fact{border-left:2px solid var(--line);padding-left:10px;display:flex;flex-direction:column;gap:2px}
+.fact .v{font:500 19px var(--f-mono);font-variant-numeric:tabular-nums}
+.fact .k{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-family:var(--f-mono)}
+.conf-high{color:var(--good)}.conf-medium{color:var(--warn)}.conf-low{color:var(--bad)}
+.ranges{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.ranges{grid-template-columns:1fr 1fr}}
+.rg{background:var(--panel-2);border-radius:4px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.rg .n{font-family:var(--f-display);font-size:15px;text-transform:uppercase;letter-spacing:.06em}
+.rg .v{font:500 22px var(--f-mono);font-variant-numeric:tabular-nums}
+.rg .s{font-size:12px;color:var(--muted);font-family:var(--f-mono)}
+.insights{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.insights li{display:grid;grid-template-columns:78px 1fr;gap:12px;align-items:start;font-size:15px}
+.insights li>*{min-width:0}
+.pill{font:500 11px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;padding:3px 0;text-align:center;border-radius:3px;border:1px solid}
+.pill.fix{color:var(--bad);border-color:var(--bad)}
+.pill.watch{color:var(--warn);border-color:var(--warn)}
+.pill.solid{color:var(--good);border-color:var(--good)}
+.tablebox{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:720px;font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:400;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+tr.best td{color:var(--signal)}
+.coach{display:flex;flex-direction:column;gap:14px}
+.coach h3{font-size:18px}
+.coach .item{border-left:2px solid var(--data);padding-left:12px;display:flex;flex-direction:column;gap:4px}
+.coach .item b{font-weight:600}
+.coach .item span{color:var(--muted);font-size:14px}
+.focus{background:var(--panel-2);border-radius:4px;padding:14px 16px;font-size:16px}
+.focus .eyebrow{display:block;margin-bottom:4px;color:var(--signal)}
+.thinking{font-family:var(--f-mono);color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap" id="setup">
+  <header class="brand">
+    <h1>Strafe<span>/</span>Lab</h1>
+    <span class="eyebrow">Tracking sensitivity finder for Apex Legends · MnK</span>
+  </header>
+  <p class="lede">A blind tracking test built around SMG fights. It sweeps you from fast wrist-aim sens down to slow arm-aim sens, records every mouse movement, zooms in on your best zone, and then a tracking coach explains what your aim is doing and what to fix.</p>
+
+  <div class="grid2">
+    <section class="panel" aria-labelledby="setup-h">
+      <h2 id="setup-h" style="font-size:20px">Your setup</h2>
+      <div class="fields">
+        <label for="dpi">Mouse DPI<input id="dpi" type="number" inputmode="numeric" min="100" max="32000" step="50" value="800"></label>
+        <label for="sens">Apex sens<input id="sens" type="number" inputmode="decimal" min="0.1" max="20" step="0.01" value="1.6"></label>
+        <label for="fov">Apex FOV<input id="fov" type="number" inputmode="numeric" min="70" max="110" step="1" value="104"></label>
+      </div>
+      <p class="calc" id="calc">Current: <b>—</b> cm/360</p>
+      <ul class="checks">
+        <li>Use your real mouse, mousepad and desk setup. Slow sens blocks need room to move your arm.</li>
+        <li>Turn off Windows "Enhance pointer precision". The test asks the browser for raw input and tells you if it got it.</li>
+        <li>About 11 minutes: a warm-up plus 10 blind blocks. Take breaks between blocks whenever you want.</li>
+        <li>Every block starts with a few unscored seconds so your hand can adjust to the new sens.</li>
+        <li>Esc pauses. The block you were in restarts.</li>
+      </ul>
+      <div id="noMouse" class="warnbox" hidden>This test needs a mouse. Open this page on your gaming PC.</div>
+      <div class="row">
+        <button class="btn" id="startBtn" type="button">Start the test</button>
+        <span class="note" id="prevNote"></span>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="ex-h">
+      <div class="row" style="justify-content:space-between">
+        <h2 id="ex-h" style="font-size:20px">What you get</h2>
+        <span class="tag ex">Example report</span>
+      </div>
+      <div class="chartbox" id="exChart"></div>
+      <p class="note">Round one sweeps a wide range from fast to slow. Round two zooms in on your best zone. The peak of the fitted curve is your sens, and the test tells you how confident it is. Then the AI tracking coach reads your mouse data range by range.</p>
+    </section>
+  </div>
+
+  <section aria-labelledby="dr-h" style="display:flex;flex-direction:column;gap:12px">
+    <h2 id="dr-h" style="font-size:20px">Every block runs the same four tracking drills</h2>
+    <div class="drills">
+      <div class="drill"><span class="spec">4 m · 10 s · 25% of score</span><h3>Point-blank</h3><p>Building and door fights. ADAD, crouch spam and jumps right in your face. Tests fast reactive tracking.</p></div>
+      <div class="drill"><span class="spec">8 m · 12 s · 30% of score</span><h3>Close SMG duel</h3><p>The classic R-99 fight: strafes, crouch spam, jump strafes and slides.</p></div>
+      <div class="drill"><span class="spec">18 m · 12 s · 20% of score</span><h3>Mid-range</h3><p>Longer strafes and sprints across your screen. Tests smooth, steady tracking without wobble.</p></div>
+      <div class="drill"><span class="spec">7 m + 10 m · up to 10 s · 25%</span><h3>2v1 fight</h3><p>Two strafing enemies with 200 HP each. You deal R-99 damage while on them. Kill one, switch, kill the other.</p></div>
+    </div>
+    <p class="note">Enemy movement uses Apex's real speeds: about 4.4 m/s strafing with a gun out, 2 m/s crouch-walking, 7.6 m/s sprinting. Every block replays the exact same movement, so your sensitivity is the only thing that changes.</p>
+  </section>
+</div>
+
+<div class="wrap" id="results" hidden></div>
+
+<div id="range" hidden>
+  <canvas id="view"></canvas>
+  <div class="hud">
+    <div class="hud-top">
+      <div><div class="drillname" id="hudDrill">Warm-up</div><div class="hint" id="hudHint"></div></div>
+      <div style="text-align:right"><div id="hudBlock">Block 1 / 11</div><div class="hint" id="hudTimer"></div></div>
+    </div>
+    <div class="xhair"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="ontrack" id="onbar"><b id="onfill"></b></div>
+    <div class="hpbars" id="hpbars" hidden>
+      <div class="hp"><span>Enemy 1</span><div class="bar"><b id="hp0"></b></div></div>
+      <div class="hp"><span>Enemy 2</span><div class="bar"><b id="hp1"></b></div></div>
+    </div>
+    <div class="banner" id="banner" hidden></div>
+  </div>
+  <div class="overlay" id="overlay">
+    <div class="card">
+      <span class="eyebrow" id="ovEyebrow">Warm-up · not scored</span>
+      <h2 id="ovTitle">Get your hand moving</h2>
+      <p id="ovText"></p>
+      <div class="progress"><b id="ovProg" style="width:0%"></b></div>
+      <p class="meta" id="ovMeta"></p>
+      <div class="row">
+        <button class="btn" id="ovGo" type="button">Click to lock mouse and start</button>
+        <button class="btn ghost" id="ovQuit" type="button">Quit test</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const DEG = Math.PI / 180;
+
+/* ---------- Verified Apex facts (checked Oct 2026) ----------
+   Yaw: 0.022 deg per mouse count at sens 1.0 (Source-style; 1.636364 sens = 10,000 counts/360).
+   FOV: slider value V maps to 4:3 horizontal FOV = 70 * (1 + (V - 70) * 0.01375).
+   Movement (apexlegends.wiki.gg): walk 5.07 m/s, sprint 7.59 m/s, crouch-walk 2.34 m/s, -13% holding a weapon.
+   R-99 (liquipedia): 11 body / 17 head, 1080 RPM -> 198 / 306 DPS. Purple shield + health = 200 HP. */
+const APEX_YAW = 0.022;
+const WALK_GUN = 5.07 * 0.87;      // 4.41 m/s strafing with a weapon out
+const CROUCH_GUN = 2.34 * 0.87;    // 2.04 m/s
+const SPRINT = 7.59;
+const DPS_BODY = 198, DPS_HEAD = 306, HP = 200;
+const EYE = 1.6;                    // camera height, approx
+const cmFromSens = (s, dpi) => 360 / (APEX_YAW * s * dpi) * 2.54;
+const sensFromCm = (cm, dpi) => 360 * 2.54 / (APEX_YAW * dpi * cm);
+const hfov43 = v => 70 * (1 + (v - 70) * 0.01375);
+const wrap = a => { a = (a + Math.PI) % (2 * Math.PI); if (a < 0) a += 2 * Math.PI; return a - Math.PI; };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
+const fmt = (v, d = 1) => (v == null || !isFinite(v)) ? "—" : (+v).toFixed(d);
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+/* ---------- Drills ---------- */
+// mix: weights for movement segments. dist in metres, bound = how far they strafe either side.
+const DRILLS = {
+  pb:    { name: "Point-blank", hint: "Stay on them through ADAD, crouch spam and jumps.", dist: 4, bound: 2.6, dur: 10, seed: 101, mix: { adad: .45, crouch: .25, run: .15, jump: .15 }, sub: [.16, .38], weight: .25 },
+  close: { name: "Close SMG duel", hint: "R-99 range. Track through strafes, crouches, jumps and slides.", dist: 8, bound: 4.5, dur: 12, seed: 202, mix: { adad: .35, run: .18, crouch: .17, jump: .15, slide: .15 }, sub: [.18, .45], weight: .30 },
+  mid:   { name: "Mid-range", hint: "Smooth and steady. No wobble.", dist: 18, bound: 8, dur: 12, seed: 303, mix: { run: .32, adad: .25, sprint: .15, crouch: .15, jump: .13 }, sub: [.3, .7], weight: .20 },
+  duo:   { name: "2v1 fight", hint: "You deal R-99 damage while on target. Kill one, switch, kill the other.", dur: 10, seed: 404, weight: .25 },
+  acc:   { name: "Adjusting", hint: "Not scored. Get used to this sensitivity.", dist: 8, bound: 4.5, dur: 4, seed: 505, mix: { adad: .4, run: .3, crouch: .15, jump: .15 }, sub: [.2, .5] }
+};
+const SEQ = ["acc", "pb", "close", "mid", "duo"];
+
+/* ---------- Setup ---------- */
+const saved = store.get("strafelab.settings", null);
+if (saved) { $("#dpi").value = saved.dpi; $("#sens").value = saved.sens; $("#fov").value = saved.fov; }
+function readSettings() {
+  return { dpi: clamp(+$("#dpi").value || 800, 100, 32000), sens: clamp(+$("#sens").value || 1.6, 0.05, 20), fov: clamp(+$("#fov").value || 104, 70, 110) };
+}
+function updateCalc() {
+  const s = readSettings();
+  $("#calc").innerHTML = `Current: <b>${fmt(cmFromSens(s.sens, s.dpi), 1)}</b> cm/360 · <b>${Math.round(s.sens * s.dpi)}</b> eDPI · ${fmt(hfov43(s.fov), 1)}° FOV at 4:3`;
+}
+["dpi", "sens", "fov"].forEach(id => $("#" + id).addEventListener("input", updateCalc));
+updateCalc();
+const finePointer = matchMedia("(pointer: fine)").matches && "requestPointerLock" in Element.prototype;
+if (!finePointer) { $("#noMouse").hidden = false; $("#startBtn").disabled = true; }
+const sessions = store.get("strafelab.sessions", []);
+function prevNote() {
+  if (!sessions.length) return;
+  const last = sessions[sessions.length - 1];
+  $("#prevNote").textContent = `Last result: ${fmt(last.recSens, 2)} sens at ${last.dpi} DPI (${fmt(last.recCm, 1)} cm/360)`;
+}
+prevNote();
+
+/* ---------- 3D range ---------- */
+let renderer, scene, camera, raycaster, enemies = [];
+function makeEnemy(color) {
+  const bodyMat = new THREE.MeshLambertMaterial({ color, emissive: 0x2a0e04 });
+  const headMat = new THREE.MeshLambertMaterial({ color: 0xffd2b8, emissive: 0x2a0e04 });
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.3, 1.45, 16), bodyMat);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), headMat);
+  g.add(body, head); g.userData = { body, head, bodyMat }; g.visible = false;
+  scene.add(g); return g;
+}
+function init3D() {
+  if (renderer) return;
+  renderer = new THREE.WebGLRenderer({ canvas: $("#view"), antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1d232c);
+  scene.fog = new THREE.Fog(0x1d232c, 45, 130);
+  camera = new THREE.PerspectiveCamera(70, 1, 0.05, 300);
+  camera.rotation.order = "YXZ";
+  camera.position.set(0, EYE, 0);
+  scene.add(new THREE.HemisphereLight(0xdfe8f2, 0x2a2420, 0.9));
+  const sun = new THREE.DirectionalLight(0xfff1e0, 0.7); sun.position.set(20, 40, 10); scene.add(sun);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ color: 0x2a313b }));
+  floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  const grid = new THREE.GridHelper(400, 200, 0x46505e, 0x353d48); grid.position.y = 0.01; scene.add(grid);
+  const r = mulberry32(99), boxMat = new THREE.MeshLambertMaterial({ color: 0x48525f });
+  for (let i = 0; i < 38; i++) {
+    const a = r() * Math.PI * 2, d = 28 + r() * 40, w = 2 + r() * 6, h = 1.5 + r() * 7;
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 2 + r() * 5), boxMat);
+    b.position.set(Math.sin(a) * d, h / 2, Math.cos(a) * d); b.rotation.y = r() * 3; scene.add(b);
+  }
+  enemies = [makeEnemy(0xff7a3d), makeEnemy(0xff9a4d)];
+  raycaster = new THREE.Raycaster();
+  addEventListener("resize", sizeView);
+}
+function placeEnemy(e, s, theta, dist) {
+  const f = { x: -Math.sin(theta), z: -Math.cos(theta) }, r = { x: Math.cos(theta), z: -Math.sin(theta) };
+  const x = f.x * dist + r.x * s.x, z = f.z * dist + r.z * s.x;
+  const { body, head } = e.userData;
+  e.position.set(x, s.y, z);
+  body.scale.y = s.h; body.position.y = 0.725 * s.h; head.position.y = 1.45 * s.h + 0.16;
+  e.lookAt(0, s.y, 0); e.visible = true;
+  return { x, y: s.y + 1.0 * s.h, z };
+}
+function sizeView() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  const s = run.settings || readSettings();
+  const h43 = hfov43(s.fov) * DEG;
+  camera.fov = 2 * Math.atan(Math.tan(h43 / 2) * 3 / 4) / DEG; // vertical FOV (Hor+)
+  camera.updateProjectionMatrix();
+}
+function aimHit(list) {
+  camera.rotation.set(view.pitch, view.yaw, 0);
+  scene.updateMatrixWorld();
+  raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+  const objs = []; list.forEach(e => { if (e.visible) objs.push(e.userData.body, e.userData.head); });
+  const hit = raycaster.intersectObjects(objs, false);
+  if (!hit.length) return null;
+  const o = hit[0].object, e = list.find(q => q.userData.body === o || q.userData.head === o);
+  return { e, head: o === e.userData.head };
+}
+const angTo = p => ({ yaw: Math.atan2(-p.x, -p.z), pitch: Math.atan2(p.y - EYE, Math.hypot(p.x, p.z)) });
+
+/* ---------- Input ---------- */
+const view = { yaw: 0, pitch: 0, k: 0, counts: 0 };
+let locked = false, rawInput = false;
+document.addEventListener("mousemove", e => {
+  if (!locked || !run.live) return;
+  view.yaw -= e.movementX * view.k;
+  view.pitch = clamp(view.pitch - e.movementY * view.k, -89 * DEG, 89 * DEG);
+  view.counts += Math.hypot(e.movementX, e.movementY);
+});
+async function lockMouse() {
+  const c = $("#view");
+  try { await c.requestPointerLock({ unadjustedMovement: true }); rawInput = true; }
+  catch {
+    rawInput = false;
+    try { const p = c.requestPointerLock(); if (p && p.catch) await p; } catch { }
+  }
+}
+document.addEventListener("pointerlockchange", () => {
+  locked = document.pointerLockElement === $("#view");
+  if (locked && run.phase === "ready") { $("#ovGo").textContent = "Press Space or click to start"; startBlock(); }
+  if (!locked && run.live) pauseBlock();
+});
+
+/* ---------- Test plan ---------- */
+const run = { settings: null, blocks: [], bi: 0, phase: "idle", live: false };
+const R1_N = 6, R2 = [0.86, 0.95, 1.05, 1.16];
+function sweep(baseCm) {
+  // Wide, log-spaced sweep from fast wrist-aim to slow arm-aim, always covering the player's current sens.
+  const lo = clamp(Math.min(baseCm * 0.6, 22), 8, 40), hi = clamp(Math.max(baseCm * 2.0, 55), lo * 2.2, 90);
+  return Array.from({ length: R1_N }, (_, i) => Math.exp(Math.log(lo) + (Math.log(hi) - Math.log(lo)) * i / (R1_N - 1)));
+}
+function startTest() {
+  const s = readSettings(); store.set("strafelab.settings", s);
+  run.settings = s; run.baseCm = cmFromSens(s.sens, s.dpi);
+  run.blocks = [{ cm: run.baseCm, warm: true }, ...shuffle(sweep(run.baseCm)).map(cm => ({ cm, round: 1 }))];
+  run.totalPlanned = 1 + R1_N + R2.length;
+  run.bi = 0;
+  init3D();
+  $("#setup").hidden = true; $("#results").hidden = true; $("#range").hidden = false;
+  sizeView();
+  try { $("#range").requestFullscreen?.().catch(() => {}); } catch { }
+  showReady();
+  requestAnimationFrame(loop);
+}
+function showReady() {
+  run.phase = "ready"; run.live = false;
+  const b = run.blocks[run.bi];
+  enemies.forEach(e => e.visible = false); $("#hpbars").hidden = true; $("#banner").hidden = true;
+  const n = run.bi + 1;
+  $("#ovEyebrow").textContent = b.warm ? "Warm-up · not scored" : `Block ${n} of ${run.totalPlanned} · round ${b.round} · sensitivity hidden`;
+  $("#ovTitle").textContent = b.warm ? "Get your hand moving" : (b.round === 2 ? "Zooming in" : "Next block");
+  $("#ovText").textContent = b.warm
+    ? "One block at your current sens so your first scored block isn't cold. It runs the same drills as the real test."
+    : b.round === 2 ? "Round two tests small steps around your best zone. These blocks decide your exact number."
+    : "New hidden sensitivity. Some will feel very fast or very slow on purpose. Play every one like a real fight.";
+  $("#ovProg").style.width = `${(run.bi / run.totalPlanned) * 100}%`;
+  run.readyAt = performance.now();
+  $("#ovMeta").textContent = !locked && run.bi === 0 ? "" : rawInput ? "Raw input: on" : "Raw input isn't available in this browser. Make sure Enhance pointer precision is off and Windows pointer speed is 6/11.";
+  $("#ovGo").textContent = locked ? "Press Space or click to start" : "Click to lock mouse and start";
+  $("#overlay").hidden = false;
+  $("#hudDrill").textContent = b.warm ? "Warm-up" : "Ready";
+  $("#hudBlock").textContent = `Block ${n} / ${run.totalPlanned}`;
+  $("#hudHint").textContent = ""; $("#hudTimer").textContent = "";
+}
+$("#ovGo").addEventListener("click", () => { if (!locked) lockMouse(); else startBlock(); });
+$("#ovQuit").addEventListener("click", quitTest);
+document.addEventListener("keydown", e => { if (e.code === "Space" && run.phase === "ready" && locked) { e.preventDefault(); startBlock(); } });
+document.addEventListener("mousedown", e => { if (e.button === 0 && locked && run.phase === "ready") startBlock(); });
+function quitTest() {
+  run.live = false; run.phase = "idle";
+  if (document.pointerLockElement) document.exitPointerLock();
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  $("#range").hidden = true; $("#setup").hidden = false;
+}
+function pauseBlock() {
+  run.live = false;
+  showReady();
+  $("#ovEyebrow").textContent = "Paused";
+  $("#ovTitle").textContent = "Block paused";
+  $("#ovText").textContent = "This block restarts from the beginning when you resume, so a pause never counts against a sensitivity.";
+}
+
+/* ---------- Enemy movement (deterministic per drill) ---------- */
+function newMover(d, rng, x0 = 0) { const s = { d, rng, x: x0, y: 0, vx: 0, vy: 0, h: 1, dir: rng() < .5 ? -1 : 1, air: false }; pickSeg(s); return s; }
+function pickSeg(s) {
+  const R = s.rng, mix = s.d.mix; let r = R(), type = "run";
+  for (const k in mix) { if (r < mix[k]) { type = k; break; } r -= mix[k]; }
+  const sub = () => s.d.sub[0] + R() * (s.d.sub[1] - s.d.sub[0]);
+  const g = { type, speed: WALK_GUN, sub: 99, t: 1 };
+  if (type === "adad") { g.t = 1.0 + R() * 1.0; g.sub = sub(); }
+  if (type === "run") { g.t = .5 + R() * .8; }
+  if (type === "crouch") { g.t = 1 + R() * .8; g.sub = sub() * 1.4; }
+  if (type === "jump") { g.t = 2; }
+  if (type === "sprint") { g.t = .6 + R() * .5; g.speed = SPRINT; }
+  if (type === "slide") { g.t = 1.1; g.speed = SPRINT; s.slideT = 0; }
+  s.seg = g; s.subT = g.sub; s.crouched = false; s.crouchT = .2;
+  if (R() < .5) s.dir *= -1;
+  if (type === "jump") { s.vy = 4.2; s.air = true; }
+}
+function stepMover(s, dt) {
+  if (s.seg.t <= 0 && !s.air) pickSeg(s);
+  const g = s.seg; g.t -= dt;
+  if (g.type === "adad" || g.type === "crouch") { s.subT -= dt; if (s.subT <= 0) { s.dir *= -1; s.subT = g.sub * (0.7 + s.rng() * 0.6); } }
+  if (g.type === "crouch") { s.crouchT -= dt; if (s.crouchT <= 0) { s.crouched = !s.crouched; s.crouchT = .16 + s.rng() * .1; } }
+  const B = s.d.bound;
+  if (s.x > B && s.dir > 0) s.dir = -1;
+  if (s.x < -B && s.dir < 0) s.dir = 1;
+  let want = s.dir * (g.type === "crouch" && s.crouched ? CROUCH_GUN : g.speed);
+  if (g.type === "slide") { s.slideT += dt; want = s.dir * (s.slideT < 0.6 ? SPRINT : Math.max(WALK_GUN, SPRINT - (s.slideT - .6) * 7)); }
+  const acc = s.air ? 6 : 45, dv = want - s.vx;
+  s.vx += Math.sign(dv) * Math.min(Math.abs(dv), acc * dt);
+  s.x += s.vx * dt;
+  if (s.air) { s.vy -= 12 * dt; s.y += s.vy * dt; if (s.y <= 0) { s.y = 0; s.vy = 0; s.air = false; g.t = 0; } }
+  s.h = ((g.type === "crouch" && s.crouched) || g.type === "slide") ? 0.62 : 1;
+}
+
+/* ---------- Block runner ---------- */
+let B = null;
+function startBlock() {
+  if (run.phase !== "ready" || performance.now() - (run.readyAt || 0) < 600) return;
+  const b = run.blocks[run.bi], s = run.settings;
+  view.k = (360 / (b.cm / 2.54 * s.dpi)) * DEG;
+  $("#overlay").hidden = true;
+  B = { warm: !!b.warm, step: -1, data: {}, frames: [] };
+  run.live = true; run.phase = "live";
+  nextStep(performance.now());
+}
+function nextStep(now) {
+  if (B.kind && B.kind !== "gap" && B.kind !== "acc") B.data[B.kind] = { frames: B.frames, extra: B.extra };
+  B.step++;
+  if (B.step >= SEQ.length * 2) return endBlock();
+  const id = SEQ[Math.floor(B.step / 2)], isGap = B.step % 2 === 0, d = DRILLS[id];
+  enemies.forEach(e => e.visible = false); $("#hpbars").hidden = true;
+  const ban = $("#banner");
+  $("#hudDrill").textContent = d.name; $("#hudHint").textContent = d.hint; $("#hudTimer").textContent = "";
+  if (isGap) {
+    B.kind = "gap"; B.gapUntil = now + (id === "acc" ? 700 : 1300);
+    ban.hidden = false; ban.innerHTML = `${d.name}<small>${d.hint}</small>`;
+    return;
+  }
+  ban.hidden = true;
+  view.yaw = 0; view.pitch = 0;
+  B.kind = id; B.t0 = now; B.frames = []; B.extra = {}; B.c0 = view.counts;
+  const dur = B.warm && id !== "acc" ? Math.min(d.dur, 7) : d.dur;
+  B.dur = dur;
+  if (id === "duo") {
+    const rng = mulberry32(d.seed);
+    const dd = { mix: { adad: .4, run: .25, crouch: .2, jump: .15 }, sub: [.2, .45], bound: 2.5 };
+    B.movers = [newMover(dd, rng, -1), newMover(dd, rng, 1)];
+    B.duo = [{ theta: 22 * DEG, dist: 7, hp: HP }, { theta: -30 * DEG, dist: 10, hp: HP }];
+    B.extra = { kills: [], dmgBody: 0, dmgHead: 0 };
+    $("#hpbars").hidden = false; $("#hp0").style.width = "100%"; $("#hp1").style.width = "100%";
+  } else {
+    B.movers = [newMover(d, mulberry32(d.seed))];
+  }
+}
+function update(now, dt) {
+  if (!B) return;
+  if (B.kind === "gap") { if (now >= B.gapUntil) nextStep(now); return; }
+  const t = now / 1000, el = (now - B.t0) / 1000, id = B.kind;
+  if (id === "duo") return updateDuo(now, t, dt, el);
+  const d = DRILLS[id], m = B.movers[0];
+  stepMover(m, dt);
+  const p = placeEnemy(enemies[0], m, 0, d.dist);
+  const hit = aimHit([enemies[0]]);
+  const on = hit ? (hit.head ? 2 : 1) : 0;
+  enemies[0].userData.bodyMat.emissive.setHex(on ? 0x6a2508 : 0x2a0e04);
+  const a = angTo(p);
+  B.frames.push({ t, yaw: view.yaw, pitch: view.pitch, ty: a.yaw, tp: a.pitch, on, hw: Math.atan(0.3 / Math.hypot(p.x, p.z)), c: view.counts });
+  updateOnBar(on);
+  $("#hudTimer").textContent = `${Math.max(0, B.dur - el).toFixed(1)} s`;
+  if (el >= B.dur) nextStep(now);
+}
+function updateDuo(now, t, dt, el) {
+  let target = null, best = 1e9;
+  const pos = B.duo.map((q, i) => {
+    if (q.hp <= 0) { enemies[i].visible = false; return null; }
+    stepMover(B.movers[i], dt);
+    return placeEnemy(enemies[i], B.movers[i], q.theta, q.dist);
+  });
+  const hit = aimHit(enemies.filter((e, i) => B.duo[i].hp > 0));
+  let on = 0;
+  if (hit) {
+    const i = enemies.indexOf(hit.e), dmg = (hit.head ? DPS_HEAD : DPS_BODY) * dt;
+    B.duo[i].hp -= dmg; on = hit.head ? 2 : 1;
+    if (hit.head) B.extra.dmgHead += dmg; else B.extra.dmgBody += dmg;
+    if (B.duo[i].hp <= 0) B.extra.kills.push({ i, t: el });
+  }
+  enemies.forEach((e, i) => e.userData.bodyMat.emissive.setHex(hit && hit.e === e ? 0x6a2508 : 0x2a0e04));
+  B.duo.forEach((q, i) => $("#hp" + i).style.width = `${clamp(q.hp / HP, 0, 1) * 100}%`);
+  // frame logged against the nearest living enemy (the one you're fighting)
+  pos.forEach((p, i) => { if (!p) return; const a = angTo(p), dd = Math.abs(wrap(a.yaw - view.yaw)); if (dd < best) { best = dd; target = { a, p }; } });
+  if (target) B.frames.push({ t, yaw: view.yaw, pitch: view.pitch, ty: target.a.yaw, tp: target.a.pitch, on, hw: Math.atan(0.3 / Math.hypot(target.p.x, target.p.z)), c: view.counts });
+  updateOnBar(on);
+  const alive = B.duo.filter(q => q.hp > 0).length;
+  $("#hudTimer").textContent = `${Math.max(0, B.dur - el).toFixed(1)} s · ${2 - alive}/2 down`;
+  if (!alive || el >= B.dur) { B.extra.elapsed = el; B.extra.dealt = B.duo.reduce((s, q) => s + (HP - Math.max(0, q.hp)), 0); nextStep(now); }
+}
+let onEMA = 0;
+function updateOnBar(on) { onEMA = onEMA * 0.94 + (on ? 0.06 : 0); $("#onfill").style.width = `${onEMA * 100}%`; }
+let lastT = 0;
+function loop(now) {
+  if ($("#range").hidden) { lastT = 0; return; }
+  requestAnimationFrame(loop);
+  const dt = lastT ? Math.min(0.05, (now - lastT) / 1000) : 0.016; lastT = now;
+  if (run.live) update(now, dt);
+  camera.rotation.set(view.pitch, view.yaw, 0);
+  renderer.render(scene, camera);
+}
+function endBlock() {
+  run.live = false;
+  const b = run.blocks[run.bi];
+  b.data = analyzeBlock(B);
+  B = null; run.bi++;
+  if (run.bi === run.blocks.length && !run.blocks.some(x => x.round === 2)) {
+    const f = fitCurve(run.blocks.filter(x => !x.warm));
+    run.blocks.push(...shuffle(R2.map(m => ({ cm: f.peakCm * m, round: 2 }))));
+  }
+  if (run.bi >= run.blocks.length) return finishTest();
+  showReady();
+}
+
+/* ---------- Analysis ---------- */
+function analyzeTrack(fr, dpi) {
+  let tot = 0, on = 0, head = 0, behind = 0, ahead = 0, vert = 0, off = 0, osc = 0, tgtSpeed = 0;
+  const L = { t: 0, on: 0 }, R = { t: 0, on: 0 }, revs = [], close = [], perr = [];
+  let lastSign = 0, lastE = 0;
+  for (let i = 1; i < fr.length; i++) {
+    const a = fr[i], p = fr[i - 1], dt = clamp(a.t - p.t, 0, 0.05);
+    if (!dt) continue;
+    tot += dt; if (a.on) on += dt; if (a.on === 2) head += dt;
+    const dTy = wrap(a.ty - p.ty) / dt, e = wrap(a.ty - a.yaw);
+    tgtSpeed += Math.abs(dTy) / DEG * dt;
+    perr.push((a.tp - a.pitch) / DEG);
+    if (Math.abs(e) < 3 * DEG) close.push({ t: a.t, e: e / DEG });
+    if (Math.abs(e) < a.hw * 2.5 && lastE && Math.sign(e) !== Math.sign(lastE)) osc++;
+    lastE = e;
+    const moving = Math.abs(dTy) > 0.08;
+    if (moving) { const side = dTy > 0 ? L : R; side.t += dt; if (a.on) side.on += dt;
+      const sg = Math.sign(dTy); if (lastSign && sg !== lastSign) revs.push(i); lastSign = sg; }
+    if (!a.on) { off += dt; if (Math.abs(e) < a.hw) vert += dt; else if (moving) { if (Math.sign(e) === Math.sign(dTy)) behind += dt; else ahead += dt; } }
+  }
+  // recovery after the enemy changes direction
+  const rec = [];
+  for (const i0 of revs) {
+    const rt = fr[i0].t;
+    let wasOn = false; for (let k = i0 - 1; k >= 0 && rt - fr[k].t < 0.12; k--) if (fr[k].on) wasOn = true;
+    if (!wasOn) continue;
+    let lostAt = null, back = null;
+    for (let i = i0; i < fr.length && fr[i].t - rt < 1.0; i++) {
+      if (lostAt === null) { if (!fr[i].on) lostAt = fr[i].t; else if (fr[i].t - rt > 0.3) break; }
+      else if (fr[i].on) { back = fr[i].t; break; }
+    }
+    rec.push(lostAt === null ? 0 : back === null ? 1000 : (back - rt) * 1000);
+  }
+  // jitter: wobble of the aim error around its own 80 ms average while near the target
+  let j2 = 0, jn = 0;
+  for (let i = 0; i < close.length; i++) {
+    let s = 0, c = 0;
+    for (let k = i; k >= 0 && close[i].t - close[k].t <= 0.04; k--) { s += close[k].e; c++; }
+    for (let k = i + 1; k < close.length && close[k].t - close[i].t <= 0.04; k++) { s += close[k].e; c++; }
+    const d = close[i].e - s / c; j2 += d * d; jn++;
+  }
+  // hand movement: travel and peak speed (cm, cm/s), from raw counts
+  const cm = c => c / dpi * 2.54;
+  let peak = 0;
+  for (let i = 0, j = 0; i < fr.length; i++) { while (fr[i].t - fr[j].t > 0.06) j++; const dt = fr[i].t - fr[j].t; if (dt >= 0.03) peak = Math.max(peak, cm(fr[i].c - fr[j].c) / dt); }
+  const lr = (behind + ahead) || 1;
+  return {
+    on: tot ? on / tot * 100 : 0, head: tot ? head / tot * 100 : 0,
+    behind: behind / lr * 100, vertMiss: off ? vert / off * 100 : 0,
+    left: L.t ? L.on / L.t * 100 : 0, right: R.t ? R.on / R.t * 100 : 0,
+    recover: rec.length ? mean(rec) : 0, jitter: jn ? Math.sqrt(j2 / jn) : 0,
+    oscPerSec: tot ? osc / tot : 0, pitchErr: mean(perr),
+    targetSpeed: tot ? tgtSpeed / tot : 0,
+    handTravel: fr.length ? cm(fr[fr.length - 1].c - fr[0].c) : 0, handPeak: peak
+  };
+}
+function analyzeBlock(Bk) {
+  const dpi = run.settings.dpi, out = {};
+  for (const id of ["pb", "close", "mid", "duo"]) out[id] = analyzeTrack(Bk.data[id]?.frames || [], dpi);
+  const x = Bk.data.duo?.extra || {};
+  const elapsed = x.elapsed || DRILLS.duo.dur, dealt = x.dealt || 0;
+  const k = x.kills || [];
+  out.duo.killTime = k.length === 2 ? k[1].t : null;
+  out.duo.firstKill = k.length ? k[0].t : null;
+  out.duo.dealt = dealt;
+  out.duo.headDmgPct = (x.dmgBody + x.dmgHead) ? x.dmgHead / (x.dmgBody + x.dmgHead) * 100 : 0;
+  // switch time: from first kill until back on the second enemy
+  if (k.length) {
+    const fr = Bk.data.duo.frames, t0 = fr.length ? fr[0].t + k[0].t : 0;
+    const back = fr.find(f => f.t > t0 + 0.02 && f.on);
+    out.duo.switchMs = back ? (back.t - t0) * 1000 : null;
+  } else out.duo.switchMs = null;
+  // duo score: damage rate vs perfect body-only R-99 tracking (198 DPS) — 100 = never off target
+  out.duo.score = clamp(dealt / (DPS_BODY * elapsed) * 100, 0, 100);
+  const W = DRILLS;
+  out.score = W.pb.weight * out.pb.on + W.close.weight * out.close.on + W.mid.weight * out.mid.on + W.duo.weight * out.duo.score;
+  out.order = run.bi;
+  return out;
+}
+function quadFit(pts) {
+  // least squares y = a(x-xm)^2 + b(x-xm) + c ; x = ln(cm)
+  const xm = mean(pts.map(p => p.x)); const S = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], V = [0, 0, 0];
+  for (const p of pts) { const x = p.x - xm, r = [x * x, x, 1]; for (let i = 0; i < 3; i++) { V[i] += r[i] * p.y; for (let j = 0; j < 3; j++) S[i][j] += r[i] * r[j]; } }
+  const c = solve3(S, V); if (!c) return null;
+  return { c, xm, f: x => c[0] * (x - xm) ** 2 + c[1] * (x - xm) + c[2] };
+}
+function peakOf(pts) {
+  const xs = pts.map(p => p.x), xmin = Math.min(...xs), xmax = Math.max(...xs);
+  let best = pts[0]; for (const p of pts) if (p.y > best.y) best = p;
+  const q = pts.length >= 3 ? quadFit(pts) : null;
+  if (q && q.c[0] < 0) { const v = q.xm - q.c[1] / (2 * q.c[0]); if (v >= xmin && v <= xmax) return { x: v, curved: true, q, edge: false, xmin, xmax }; return { x: v < xmin ? xmin : xmax, curved: false, q, edge: true, xmin, xmax }; }
+  return { x: best.x, curved: false, q, edge: best.x === xmin || best.x === xmax, xmin, xmax };
+}
+function fitCurve(blocks, key = b => b.data.score) {
+  const pts = blocks.filter(b => b.data).map(b => ({ x: Math.log(b.cm), y: key(b), cm: b.cm }));
+  const pk = peakOf(pts), f = pk.q ? pk.q.f : null;
+  const peakY = pk.curved ? f(pk.x) : Math.max(...pts.map(p => p.y));
+  let lo = pk.x, hi = pk.x;
+  if (pk.curved) for (let i = 0; i <= 300; i++) { const x = pk.xmin + (pk.xmax - pk.xmin) * i / 300; if (f(x) >= peakY - 2) { lo = Math.min(lo, x); hi = Math.max(hi, x); } }
+  // stability: refit leaving each block out; spread of the peak = how dialed-in the answer is
+  let loo = [];
+  if (pts.length >= 5) for (let i = 0; i < pts.length; i++) loo.push(Math.exp(peakOf(pts.filter((_, j) => j !== i)).x));
+  const spread = loo.length ? (Math.max(...loo) - Math.min(...loo)) / 2 / Math.exp(pk.x) * 100 : null;
+  const rmse = f ? Math.sqrt(mean(pts.map(p => (p.y - f(p.x)) ** 2))) : null;
+  return { pts, f, peakCm: Math.exp(pk.x), peakY, lo: Math.exp(lo), hi: Math.exp(hi), edge: pk.edge, curved: pk.curved, spread, rmse };
+}
+function solve3(A, b) {
+  const M = A.map((r, i) => [...r, b[i]]);
+  for (let i = 0; i < 3; i++) {
+    let p = i; for (let r = i + 1; r < 3; r++) if (Math.abs(M[r][i]) > Math.abs(M[p][i])) p = r;
+    if (Math.abs(M[p][i]) < 1e-9) return null; [M[i], M[p]] = [M[p], M[i]];
+    for (let r = 0; r < 3; r++) if (r !== i) { const k = M[r][i] / M[i][i]; for (let c = i; c < 4; c++) M[r][c] -= k * M[i][c]; }
+  }
+  return [M[0][3] / M[0][0], M[1][3] / M[1][1], M[2][3] / M[2][2]];
+}
+function confidence(fit) {
+  if (fit.edge || !fit.curved) return { level: "low", why: "your best score sat at the edge of the tested range" };
+  if (fit.spread != null && fit.spread <= 6 && fit.rmse < 4) return { level: "high", why: `the peak moves less than ±${Math.max(1, Math.round(fit.spread))}% when any single block is removed` };
+  if (fit.spread != null && fit.spread <= 12) return { level: "medium", why: `the peak moves about ±${Math.round(fit.spread)}% when any single block is removed` };
+  return { level: "low", why: "your scores were noisy from block to block" };
+}
+
+/* ---------- Chart ---------- */
+function chartSVG({ pts, f, peakCm, lo, hi, curved }, currentCm, opts = {}) {
+  const W = 640, H = 290, m = { l: 46, r: 18, t: 18, b: 44 };
+  const cms = pts.map(p => p.cm).concat(currentCm ? [currentCm] : []);
+  const x0 = Math.log(Math.min(...cms) * 0.92), x1 = Math.log(Math.max(...cms) * 1.08);
+  const ys = pts.map(p => p.y); let y0 = Math.floor((Math.min(...ys) - 6) / 10) * 10, y1 = Math.ceil((Math.max(...ys) + 6) / 10) * 10;
+  y0 = Math.max(0, y0); y1 = Math.min(100, Math.max(y1, y0 + 20));
+  const X = cm => m.l + (Math.log(cm) - x0) / (x1 - x0) * (W - m.l - m.r);
+  const Y = v => H - m.b - (v - y0) / (y1 - y0) * (H - m.t - m.b);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Tracking score by sensitivity">`;
+  for (let v = y0; v <= y1; v += 10) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${m.l - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${v}</text>`;
+  const span = Math.exp(x1) - Math.exp(x0), step = span > 60 ? 10 : 5;
+  for (let c = Math.ceil(Math.exp(x0) / step) * step; c <= Math.exp(x1); c += step) s += `<line x1="${X(c)}" x2="${X(c)}" y1="${H - m.b}" y2="${H - m.b + 5}" stroke="var(--muted)"/><text x="${X(c)}" y="${H - m.b + 18}" text-anchor="middle" font-size="11" fill="var(--muted)">${c}</text>`;
+  s += `<text x="${(W + m.l) / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--muted)">cm/360 · left = faster, right = slower</text>`;
+  if (curved) s += `<rect x="${X(lo)}" y="${m.t}" width="${Math.max(2, X(hi) - X(lo))}" height="${H - m.t - m.b}" fill="var(--signal)" opacity=".10"/>`;
+  if (f) { let d = ""; const a = Math.log(Math.min(...pts.map(p => p.cm))), b = Math.log(Math.max(...pts.map(p => p.cm)));
+    for (let i = 0; i <= 80; i++) { const x = a + (b - a) * i / 80, v = clamp(f(x), y0, y1); d += (i ? "L" : "M") + X(Math.exp(x)).toFixed(1) + " " + Y(v).toFixed(1); }
+    s += `<path d="${d}" fill="none" stroke="var(--data)" stroke-width="2.5"/>`; }
+  if (currentCm) s += `<line x1="${X(currentCm)}" x2="${X(currentCm)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--muted)" stroke-dasharray="4 4"/><text x="${X(currentCm) + 5}" y="${m.t + 12}" font-size="11" fill="var(--muted)">current</text>`;
+  for (const p of pts) s += `<circle cx="${X(p.cm)}" cy="${Y(p.y)}" r="5" fill="var(--panel)" stroke="${p.r2 ? "var(--signal)" : "var(--ink)"}" stroke-width="2"/>`;
+  s += `<line x1="${X(peakCm)}" x2="${X(peakCm)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--signal)" stroke-width="2"/><text x="${X(peakCm) + 6}" y="${H - m.b - 8}" font-size="12" fill="var(--signal)">${opts.peakLabel || "best"}</text>`;
+  return s + "</svg>";
+}
+(() => {
+  const ex = [[16, 52.4], [21.5, 60.8], [29, 66.2], [39, 67.9], [52, 61.5], [70, 50.3], [30.5, 67.1], [33.7, 68.6], [37.2, 68.2], [41.2, 66.4]];
+  const fit = fitCurve(ex.map(([cm, y]) => ({ cm, data: { score: y } })));
+  $("#exChart").innerHTML = chartSVG(fit, 27, { peakLabel: "example best" });
+})();
+
+/* ---------- Results ---------- */
+function finishTest() {
+  run.phase = "idle";
+  if (document.pointerLockElement) document.exitPointerLock();
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  $("#range").hidden = true;
+  renderResults();
+}
+const RNAMES = { pb: "Point-blank", close: "Close duel", mid: "Mid-range", duo: "2v1 fight" };
+function habits(scored) {
+  const ids = ["pb", "close", "mid"], avg = k => mean(scored.flatMap(b => ids.map(i => b.data[i][k])));
+  return { behind: avg("behind"), vertMiss: avg("vertMiss"), left: avg("left"), right: avg("right"), recover: avg("recover"), jitter: avg("jitter"), oscPerSec: avg("oscPerSec"), pitchErr: avg("pitchErr"), head: avg("head") };
+}
+function fatigue(scored, fit) {
+  if (!fit.f) return 0;
+  const r = scored.map(b => ({ o: b.data.order, e: b.data.score - fit.f(Math.log(b.cm)) }));
+  const om = mean(r.map(x => x.o)), em = mean(r.map(x => x.e));
+  let num = 0, den = 0; for (const x of r) { num += (x.o - om) * (x.e - em); den += (x.o - om) ** 2; }
+  return den ? num / den : 0;
+}
+function localInsights(h, fit, per, fat, scored) {
+  const out = [], diff = (fit.peakCm / run.baseCm - 1) * 100;
+  if (Math.abs(diff) < 6) out.push(["solid", `Your current sens is already within ${Math.abs(diff).toFixed(0)}% of your best. Keep it and put your time into the habits below.`]);
+  else out.push(["fix", `You tracked best ${Math.abs(diff).toFixed(0)}% ${diff > 0 ? "slower" : "faster"} than your current sens (${fmt(fit.peakCm, 1)} vs ${fmt(run.baseCm, 1)} cm/360).`]);
+  const pbC = per.pb.peakCm, midC = per.mid.peakCm;
+  if (pbC && midC && midC / pbC > 1.35) out.push(["watch", `Point-blank wants a faster sens (${fmt(pbC, 0)} cm/360) than mid-range (${fmt(midC, 0)} cm/360). Your recommended sens is the compromise, weighted toward close range.`]);
+  const lr = h.left - h.right;
+  if (Math.abs(lr) >= 6) out.push(["fix", `You're stronger tracking ${lr > 0 ? "leftward" : "rightward"} strafes: ${fmt(Math.max(h.left, h.right), 0)}% on target vs ${fmt(Math.min(h.left, h.right), 0)}% the other way.`]);
+  else out.push(["solid", `Left and right tracking are balanced (${fmt(h.left, 0)}% vs ${fmt(h.right, 0)}%).`]);
+  if (h.behind > 62) out.push(["fix", `When you lose a strafing enemy, ${fmt(h.behind, 0)}% of that time you're trailing behind them. You're reacting to their strafe instead of matching it.`]);
+  else if (h.behind < 38) out.push(["watch", `When you lose the enemy you're usually ahead of them (${fmt(100 - h.behind, 0)}%). You over-lead and get caught by their next direction change.`]);
+  if (h.recover > 200) out.push(["fix", `After an enemy changes direction it takes you ${fmt(h.recover, 0)} ms on average to get back on them. That gap is where ADAD spam wins fights.`]);
+  if (h.vertMiss > 30) out.push(["fix", `${fmt(h.vertMiss, 0)}% of your off-target time is vertical: lined up left-right but above or below them, mostly on crouch spam and jumps.`]);
+  const fast = scored.filter(b => b.cm < fit.peakCm * 0.8), slow = scored.filter(b => b.cm > fit.peakCm * 1.25);
+  const jit = arr => mean(arr.map(b => mean(["pb", "close", "mid"].map(i => b.data[i].jitter))));
+  if (fast.length && slow.length && jit(fast) > jit(slow) * 1.3) out.push(["watch", `Your aim wobbles more at fast sens (${fmt(jit(fast), 2)}° vs ${fmt(jit(slow), 2)}° at slow). That's the cost of wrist aiming at high sens.`]);
+  if (fat < -1.2) out.push(["watch", `Scores dropped about ${fmt(-fat, 1)} points per block as the test went on. Fatigue shows up early for you.`]);
+  return out;
+}
+function renderResults() {
+  const s = run.settings, scored = run.blocks.filter(b => !b.warm && b.data);
+  const fit = fitCurve(scored); fit.pts.forEach((p, i) => p.r2 = scored[i].round === 2);
+  const per = {}; for (const id of ["pb", "close", "mid", "duo"]) per[id] = fitCurve(scored, b => id === "duo" ? b.data.duo.score : b.data[id].on);
+  const h = habits(scored), fat = fatigue(scored, fit), conf = confidence(fit);
+  const rec = sensFromCm(fit.peakCm, s.dpi), recLo = sensFromCm(fit.hi, s.dpi), recHi = sensFromCm(fit.lo, s.dpi);
+  const prev = sessions.length ? sessions[sessions.length - 1] : null;
+  sessions.push({ at: new Date().toISOString(), dpi: s.dpi, recCm: fit.peakCm, recSens: rec, baseCm: run.baseCm });
+  store.set("strafelab.sessions", sessions.slice(-8));
+  const ins = localInsights(h, fit, per, fat, scored);
+  const bestB = scored.reduce((a, b) => b.data.score > a.data.score ? b : a, scored[0]);
+  const rows = run.blocks.filter(b => b.data).map((b, i) => { const d = b.data; return `<tr class="${b === bestB ? "best" : ""}"><td>${b.warm ? "Warm-up" : `Block ${i + 1} · R${b.round}`}</td><td>${fmt(sensFromCm(b.cm, s.dpi), 2)}</td><td>${fmt(b.cm, 1)}</td><td>${b.warm ? "—" : fmt(d.score, 1)}</td><td>${fmt(d.pb.on, 0)}%</td><td>${fmt(d.close.on, 0)}%</td><td>${fmt(d.mid.on, 0)}%</td><td>${d.duo.killTime != null ? fmt(d.duo.killTime, 2) + " s" : Math.round(d.duo.dealt) + " dmg"}</td><td>${fmt(d.close.recover, 0)}</td><td>${fmt(mean([d.pb.jitter, d.close.jitter, d.mid.jitter]), 2)}</td><td>${fmt(Math.max(d.pb.handPeak, d.close.handPeak), 0)}</td></tr>`; }).join("");
+  let consistency;
+  if (prev && prev.dpi) { const d = (fit.peakCm / prev.recCm - 1) * 100; consistency = Math.abs(d) <= 8 ? `Matches your last session within ${Math.abs(d).toFixed(0)}%, so this is a reliable number.` : `Your last session landed ${Math.abs(d).toFixed(0)}% ${d > 0 ? "faster" : "slower"} (${fmt(prev.recCm, 1)} cm/360). Run it once more on a fresh day and use the average.`; }
+  else consistency = "Run it again on a different day. If both land within about 8%, that's your sens.";
+  const edgeNote = fit.edge ? `<p class="warnbox">Your best score was at the ${fit.peakCm > run.baseCm ? "slow" : "fast"} edge of what was tested. Set your sens to this result and run the test again; the sweep will re-center around it.</p>` : "";
+  const rg = id => { const p = per[id], b = scored.reduce((a, x) => (id === "duo" ? x.data.duo.score : x.data[id].on) > (id === "duo" ? a.data.duo.score : a.data[id].on) ? x : a, scored[0]);
+    const v = id === "duo" ? (b.data.duo.killTime != null ? fmt(b.data.duo.killTime, 2) + " s" : Math.round(b.data.duo.dealt) + " dmg") : fmt(b.data[id].on, 0) + "%";
+    return `<div class="rg"><span class="n">${RNAMES[id]}</span><span class="v">${fmt(sensFromCm(p.peakCm, s.dpi), 2)}</span><span class="s">best sens · ${fmt(p.peakCm, 0)} cm/360</span><span class="s">top block: ${v}${id === "duo" ? " to kill both" : " on target"}</span></div>`; };
+  $("#results").innerHTML = `
+    <header class="brand"><h1>Strafe<span>/</span>Lab</h1><span class="eyebrow">Your result · ${new Date().toLocaleDateString()}</span></header>
+    <section class="hero">
+      <div><span class="eyebrow">Recommended Apex sens at ${s.dpi} DPI</span><div class="bignum">${fmt(rec, 2)}<small>${fmt(fit.peakCm, 1)} cm/360</small></div></div>
+      <div class="facts">
+        <div class="fact"><span class="v">${fmt(s.sens, 2)}</span><span class="k">Your current</span></div>
+        <div class="fact"><span class="v">${fit.curved ? fmt(recLo, 2) + "–" + fmt(recHi, 2) : "—"}</span><span class="k">Sweet spot</span></div>
+        <div class="fact"><span class="v">${Math.round(rec * s.dpi)}</span><span class="k">eDPI</span></div>
+        <div class="fact"><span class="v conf-${conf.level}">${conf.level}</span><span class="k">Confidence</span></div>
+      </div>
+    </section>
+    <p class="note">Confidence is ${conf.level} because ${conf.why}. ${consistency} The in-game slider takes one decimal (${fmt(rec, 1)}); for the exact value, set mouse_sensitivity in Apex's settings.cfg. This tunes hipfire. Keep your ADS multipliers as they are for now.</p>
+    ${edgeNote}
+    <section class="panel"><div class="row" style="justify-content:space-between"><h2 style="font-size:18px">Tracking score by sensitivity</h2><span class="tag">${scored.length} blind blocks · orange = zoom round</span></div><div class="chartbox">${chartSVG(fit, run.baseCm)}</div></section>
+    <section class="panel"><h2 style="font-size:18px">Best sens by range</h2><div class="ranges">${["pb", "close", "mid", "duo"].map(rg).join("")}</div><p class="note">Each range fitted on its own. When these split apart, your overall sens is the weighted compromise: close range and the 2v1 count for 80% of the score because that's where SMG fights are decided.</p></section>
+    <section class="panel"><h2 style="font-size:18px">What your mouse data shows</h2><ul class="insights">${ins.map(([k, t]) => `<li><span class="pill ${k}">${k === "fix" ? "Fix" : k === "watch" ? "Watch" : "Solid"}</span><span>${t}</span></li>`).join("")}</ul></section>
+    <section class="panel coach" id="coach"><div class="row" style="justify-content:space-between"><h2 style="font-size:18px">AI tracking coach</h2><span class="tag">Claude</span></div>
+      <p class="note" id="coachNote">Claude reads every metric from every block, range by range, and explains how your tracking changes from fast to slow sens, what's costing you SMG fights, and what to drill.</p>
+      <div class="row"><button class="btn" id="coachBtn" type="button" hidden>Get tracking coaching</button><button class="btn ghost" id="coachStop" type="button" hidden>Stop</button></div>
+      <div id="coachOut"></div></section>
+    <section class="panel"><h2 style="font-size:18px">Every block</h2><div class="tablebox"><table><thead><tr><th>Block</th><th>Sens</th><th>cm/360</th><th>Score</th><th>Point-blank</th><th>Close</th><th>Mid</th><th>2v1</th><th>Recover ms</th><th>Wobble °</th><th>Hand cm/s</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="note">Blocks in the order you played them. Range columns are time on target. Recover is time to get back on an enemy after they change direction (close duel). Wobble is high-frequency shake near the target. Hand cm/s is your fastest hand movement.</p></section>
+    <div class="row"><button class="btn" id="againBtn" type="button">Run the test again</button><button class="btn ghost" id="copyBtn" type="button">Copy report</button><button class="btn ghost" id="setupBtn" type="button">Change setup</button><span class="note" id="copyNote"></span></div>`;
+  $("#results").hidden = false; scrollTo(0, 0);
+  const r1 = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === "number" ? +v.toFixed(2) : v]));
+  const report = {
+    setup: { dpi: s.dpi, apexFovSlider: s.fov, currentSens: s.sens, currentCm360: +run.baseCm.toFixed(1), rawInput },
+    result: { recommendedSens: +rec.toFixed(2), recommendedCm360: +fit.peakCm.toFixed(1), sweetSpotSens: fit.curved ? [+recLo.toFixed(2), +recHi.toFixed(2)] : null,
+      confidence: conf.level, peakStabilityPlusMinusPct: fit.spread != null ? +fit.spread.toFixed(1) : null, fitRmsePoints: fit.rmse != null ? +fit.rmse.toFixed(1) : null, peakAtEdgeOfTestedRange: fit.edge,
+      bestCm360ByRange: Object.fromEntries(Object.entries(per).map(([k, p]) => [k, { cm360: +p.peakCm.toFixed(1), sens: +sensFromCm(p.peakCm, s.dpi).toFixed(2), atEdge: p.edge }])),
+      fatiguePointsPerBlock: +fat.toFixed(2) },
+    habitsAveraged: r1(h),
+    blocks: scored.map(b => ({ playedOrder: b.data.order + 1, round: b.round, sens: +sensFromCm(b.cm, s.dpi).toFixed(2), cm360: +b.cm.toFixed(1), score: +b.data.score.toFixed(1),
+      pointBlank: r1(b.data.pb), closeDuel: r1(b.data.close), midRange: r1(b.data.mid), twoVsOne: r1(b.data.duo) }))
+  };
+  $("#againBtn").onclick = () => { $("#results").hidden = true; startTest(); };
+  $("#setupBtn").onclick = () => { $("#results").hidden = true; $("#setup").hidden = false; prevNote(); scrollTo(0, 0); };
+  $("#copyBtn").onclick = () => {
+    const txt = `Strafe Lab: ${fmt(rec, 2)} sens at ${s.dpi} DPI (${fmt(fit.peakCm, 1)} cm/360), confidence ${conf.level}. Current: ${fmt(s.sens, 2)}.\n` + ins.map(i => "- " + i[1]).join("\n");
+    navigator.clipboard.writeText(txt).then(() => $("#copyNote").textContent = "Copied.").catch(() => $("#copyNote").textContent = "Copy didn't work here. Select the text above instead.");
+  };
+  setupCoach(report);
+}
+
+/* ---------- AI tracking coach (asks Claude on the viewer's account) ---------- */
+const COACH_FACTS = `HOW THE TEST WORKS
+- Blind test: the player did not know which sensitivity each block used. Round 1 = 6 blocks log-spaced from fast to slow (wide sweep). Round 2 = 4 blocks at 0.86/0.95/1.05/1.16x of the round-1 peak. Order shuffled.
+- Each block starts with 4 s of unscored adjustment, then four drills. Enemy movement is identical in every block (fixed random seed), so sensitivity is the only variable.
+- Point-blank: enemy at 4 m, 10 s. Close SMG duel: 8 m, 12 s. Mid-range: 18 m, 12 s. 2v1: enemies at 7 m and 10 m, 200 HP each, 10 s limit, player deals R-99 damage while the crosshair is on them (198 DPS body, 306 DPS head).
+- Score per block = 25% point-blank time-on-target + 30% close + 20% mid + 25% 2v1 damage rate (100 = never off target, body only).
+- Recommended sens = peak of a quadratic fit of score vs ln(cm/360). bestCm360ByRange = the same fit per drill.
+- peakStabilityPlusMinusPct = how far the peak moves when any one block is left out (smaller = more dialed in). fitRmsePoints = block-to-block noise around the curve.
+
+APEX FACTS (verified)
+- Sens: cm/360 = 360 / (0.022 x sens x DPI) x 2.54. Higher cm/360 = slower sens = more arm movement.
+- Enemy speeds used: strafing with a weapon ~4.4 m/s (walk 5.07 m/s minus 13% for holding a gun), crouch-walking ~2.0 m/s, sprint 7.59 m/s. Crouch spam lowers the hitbox; jumps and slides change height. Hitbox approx 0.6 m wide, 1.8 m tall standing.
+- R-99: 11 body / 17 head damage, 1080 RPM. A purple-shielded enemy has 200 effective HP, so a perfect body-only R-99 kill takes about 1.0 s.
+- Typical enemy angular speeds: at 4 m a 4.4 m/s strafe is ~60 deg/s, at 8 m ~30 deg/s, at 18 m ~14 deg/s. targetSpeed in the data is the measured average.
+
+METRICS (per drill)
+- on: % of time crosshair on the enemy. head: % on the head.
+- behind: of off-target time while the enemy moved, % trailing behind them (100 - behind = ahead, over-leading).
+- vertMiss: % of off-target time where horizontal aim was right but height was wrong (crouch spam, jumps, slides).
+- left / right: on-target % while the enemy moved left / right on screen.
+- recover: ms to get back on the enemy after they reverse direction (0 = never lost them).
+- jitter: degrees of high-frequency wobble near the enemy. oscPerSec: times per second the crosshair crossed back and forth over the enemy (over-correcting).
+- pitchErr: mean degrees the crosshair sat below (+) or above (-) the chest.
+- handTravel: cm the hand moved. handPeak: fastest hand speed in cm/s. Low handPeak at slow sens with low on% means the arm couldn't keep up; high jitter at fast sens means wrist instability.
+- twoVsOne: killTime (s to kill both, null if not finished), firstKill, switchMs (from first kill until back on the second enemy), dealt (damage), headDmgPct.
+
+CAUTIONS
+- One session is noisy. Players also score slightly better near their current sens because of muscle memory, so a peak close to the current sens partly reflects habit. Say so if relevant.
+- Only use numbers present in the data. Do not invent metrics, pro settings or claims about specific players.`;
+async function setupCoach(report) {
+  const btn = $("#coachBtn"), stop = $("#coachStop"), out = $("#coachOut"), note = $("#coachNote");
+  let sample = null;
+  try { sample = await (window.claude?.use ? window.claude.use("sample") : null); } catch { sample = null; }
+  if (!sample) { note.textContent = "The AI coach runs when this page is opened in Claude. Your sens result and mouse-data findings above work everywhere."; return; }
+  btn.hidden = false;
+  let ctl;
+  stop.onclick = () => ctl?.abort();
+  btn.onclick = async () => {
+    btn.disabled = true; stop.hidden = false; ctl = new AbortController();
+    out.innerHTML = `<p class="thinking">Reading your tracking data… this takes up to a minute.</p>`;
+    const prompt = `You are an expert Apex Legends tracking coach for mouse and keyboard players, focused on SMG fights at close and mid range. The player says they are weakest at close and mid-range SMG tracking and currently wrist-aims. Using ONLY the data below, (1) confirm or question the recommended sensitivity by explaining how their tracking changed from fast to slow sens, range by range, and whether arm or wrist aim looks better for them; (2) diagnose their tracking weaknesses; (3) give specific practice. Cite numbers for every claim. Plain, direct language. No hype.
+
+${COACH_FACTS}
+
+Reply with only JSON in exactly this shape:
+{"headline": "one sentence: the core diagnosis",
+ "sensVerdict": "3-4 sentences: which sens to use, why, how confident, and what changed between fast and slow blocks",
+ "armOrWrist": "2 sentences on whether the data supports moving toward arm aim, citing hand speed, jitter and on-target trends",
+ "ranges": [{"range": "Point-blank | Close duel | Mid-range | 2v1 fight", "verdict": "one sentence", "evidence": "numbers"}],
+ "findings": [{"title": "short", "evidence": "numbers", "meaning": "what it costs them in a real Apex fight"}],
+ "drills": [{"name": "short", "how": "exactly what to do in R5 Reloaded 1v1s, the Firing Range dummies on strafe settings, or a tracking scenario in an aim trainer", "goal": "a measurable target, using the same metrics"}],
+ "focus": "the single thing to fix first, one sentence"}
+Give all 4 ranges, 3-4 findings (most impactful first) and 3 drills.
+
+DATA:
+${JSON.stringify(report)}`;
+    try {
+      const r = await sample.json(prompt, { signal: ctl.signal, modelTier: "complex" });
+      const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      out.innerHTML = `
+        <p style="font-size:19px;font-family:var(--f-display)">${esc(r.headline)}</p>
+        <p>${esc(r.sensVerdict)}</p>
+        ${r.armOrWrist ? `<div class="focus"><span class="eyebrow">Arm or wrist</span>${esc(r.armOrWrist)}</div>` : ""}
+        <h3>By range</h3>${(r.ranges || []).map(x => `<div class="item"><b>${esc(x.range)}: ${esc(x.verdict)}</b><span>${esc(x.evidence)}</span></div>`).join("")}
+        <h3>Findings</h3>${(r.findings || []).map(f => `<div class="item"><b>${esc(f.title)}</b><span>${esc(f.evidence)}</span><span>${esc(f.meaning)}</span></div>`).join("")}
+        <h3>Drills</h3>${(r.drills || []).map(d => `<div class="item"><b>${esc(d.name)}</b><span>${esc(d.how)}</span><span>Goal: ${esc(d.goal)}</span></div>`).join("")}
+        <div class="focus"><span class="eyebrow">Fix this first</span>${esc(r.focus)}</div>`;
+    } catch (e) {
+      const msg = { not_granted: "The coach needs your OK to use Claude. Reload the page to be asked again.", rate_limited: "You've hit a usage limit. Try again in a bit.", session_expired: "Sign in to Claude again, then retry.", invalid_json: "The coach's answer came back garbled. Try again.", cancelled: "" }[e?.code] ?? "Coaching couldn't load this time. Try again.";
+      out.innerHTML = msg ? `<p class="note">${msg}</p>` : "";
+      if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled"].includes(e?.code)) btn.hidden = true;
+    } finally { btn.disabled = false; stop.hidden = true; }
+  };
+}
+
+$("#startBtn").addEventListener("click", startTest);
+})();
+</script>
