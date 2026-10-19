@@ -1,6 +1,14 @@
 # Strafe Lab — Architecture & Roadmap (v3 plan)
 
 Status: V2 prototype works (single HTML file, three.js, blind tracking sens finder, AI coach via Claude artifact runtime).
+Live build: https://hapticanalytics.github.io/strafe-lab/ (auto-deployed from `master` after typecheck, unit and e2e tests pass).
+
+## Milestone status
+
+| Milestone | Status | Notes |
+|---|---|---|
+| 0 Foundation | Done | All acceptance checks pass (unit + Playwright e2e). Added `cl_fovScale` + aspect/scaling display. React deferred to Milestone 5 (dashboard). |
+| R Research | Done (living doc) | `RESEARCH.md`. Tag lint test enforces tags in `sim/` and `analysis/`. ADS scaling is community-only → APPROX until the user's per-optic calibration. |
 Goal: a personal aim-development lab for Apex Legends MnK that measures correctly first, then coaches, then trains, and proves whether training transfers to real Apex.
 
 Guiding rules for every milestone:
