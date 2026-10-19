@@ -1,3 +1,4 @@
+import { planSweep } from "../src/sim/protocol";
 import { radPerCount } from "../src/core/units";
 import { newDiagnostics } from "../src/input/capture";
 import { synthPlayerEvents } from "../src/input/synthetic";
@@ -61,5 +62,26 @@ export function synthSessionV2(id = "v2"): SessionLog {
     schema: 2, id, startedAt: "2026-02-01T00:00:00.000Z", finishedAt: "2026-02-01T00:12:00.000Z", status: "complete",
     settings: { dpi, sens: 1.6, fovScale: 1.4675, display: { aspect: null, scaling: "stretched" } }, rawInput: true, sampling: "event",
     capture: newDiagnostics("synthetic", true), blocks,
+  };
+}
+
+/** A v3 (Sensitivity Intelligence) Quick session played by a synthetic player whose best sens is ~30 cm/360. */
+export function synthSessionV3(id = "v3"): SessionLog {
+  const dpi = 800;
+  const plan = planSweep(32, "quick", 77);
+  const blocks: BlockLog[] = plan.map((b, index) => {
+    const k = radPerCount(b.cm, dpi);
+    const lag = 0.06 + 0.25 * Math.abs(Math.log(b.cm / 30));
+    const drills: BlockLog["drills"] = {};
+    for (const s of b.segments) {
+      const sc = buildScenario(s.id, s.seed, s.dur);
+      drills[s.id] = { id: s.id, seed: s.seed, dur: s.dur, tEnd: s.dur, k, events: synthPlayerEvents(sc, k, { lag, gain: 0.5, seed: index + 1 }, 1000) };
+    }
+    return { index, warm: false, round: 1, cm360: b.cm, drills };
+  });
+  return {
+    schema: 2, id, startedAt: "2026-03-01T00:00:00.000Z", finishedAt: "2026-03-01T00:05:00.000Z", status: "complete",
+    settings: { dpi, sens: 1.6, fovScale: 1.4675, display: { aspect: null, scaling: "stretched" } }, rawInput: true, sampling: "event",
+    capture: newDiagnostics("synthetic", true), protocol: "v3", mode: "quick", sessionSeed: 77, blocks,
   };
 }

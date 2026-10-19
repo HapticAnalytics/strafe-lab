@@ -7,12 +7,14 @@ Live build: https://hapticanalytics.github.io/strafe-lab/ (auto-deployed from `m
 
 ### Runs needed from you (gaming PC)
 1. **Calibration** (Milestone 1): open https://hapticanalytics.github.io/strafe-lab/ in Chrome or Edge, click *Open calibration*, and run each test 3 times: ruler DPI (10 cm), physical 360° (marks taken from the Apex Firing Range at your current sens), input timing (5 s of circles). Then *Export JSON* and send me the file.
+2. **Sens finder test-retest** (Milestone 2): run the sens finder in **Standard** mode on two different days (same setup, rested, after a few minutes of normal play). Export JSON after the second day.
 
 
 | Milestone | Status | Notes |
 |---|---|---|
 | 0 Foundation | Done | All acceptance checks pass (unit + Playwright e2e). Added `cl_fovScale` + aspect/scaling display. React deferred to Milestone 5 (dashboard). |
 | 1 Input & telemetry | Built; 2 of 3 acceptance checks pass | Same synthetic trace gives identical logs and metrics at 60/144/240 fps (exact, not just within 0.5%): PASS. Golden files lock every M1 metric: PASS. 360° calibration error < 1%: **needs a run on the gaming PC** (see "Runs needed from you"). |
+| 2 Sens Intelligence v3 | Built; simulation acceptance conditional | Simulated player recovered within ±8% in Standard: 95% of runs at block noise σ=2 points (PASS), 83% at σ=3, 66% at σ=5 (locked table in `tests/__snapshots__/sensfinder.test.ts.snap`). Your real σ comes from Milestone 3; if it is above ~2.5 points, Standard needs more or longer blocks. Two-day test-retest: **needs runs from you**. Durations re-set from measured reliability: pending Milestone 3 data. |
 | R Research | Done (living doc) | `RESEARCH.md`. Tag lint test enforces tags in `sim/` and `analysis/`. ADS scaling is community-only → APPROX until the user's per-optic calibration. |
 Goal: a personal aim-development lab for Apex Legends MnK that measures correctly first, then coaches, then trains, and proves whether training transfers to real Apex.
 

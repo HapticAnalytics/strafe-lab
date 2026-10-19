@@ -24,6 +24,7 @@ test("a full warm-up block logs raw events and is saved", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", e => errors.push(e.message));
   await page.goto("/");
+  await page.selectOption("#mode", "quick");
   await page.click("#startBtn");
   await page.click("#ovGo");
   await page.waitForTimeout(500);
@@ -49,6 +50,7 @@ test("a full warm-up block logs raw events and is saved", async ({ page }) => {
     };
   }));
   expect(saved.blocks).toBe(1);
+  // warm-up holds the 4 Quick skills (the unscored acclimation segment is not stored)
   expect(saved.sampling).toBe("event");
   expect(saved.events).toBeGreaterThan(100);
   expect(errors).toEqual([]);

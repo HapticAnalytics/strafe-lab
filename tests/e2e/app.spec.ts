@@ -74,3 +74,23 @@ test("calibration screen opens and lists no calibrations initially", async ({ pa
   await page.click("#calBack");
   await expect(page.locator("#setup")).toBeVisible();
 });
+
+test("a v3 sens-finder session shows the range, interval and per-skill fits", async ({ page }, info) => {
+  const { synthSessionV3 } = await import("../helpers");
+  const file = info.outputPath("v3.json");
+  (await import("node:fs")).writeFileSync(file, JSON.stringify({ format: "strafe-lab-export", schema: 2, exportedAt: "2026-01-01T00:00:00.000Z", sessions: [synthSessionV3("e2e-v3")] }));
+  await page.goto("/");
+  await page.setInputFiles("#importFile", file);
+  await expect(page.locator("#histList")).toContainText("Quick");
+  await page.click("[data-open=e2e-v3]");
+  await expect(page.locator("#results")).toContainText("Best sens by skill");
+  await expect(page.locator("#results")).toContainText("95% interval");
+  await expect(page.locator("#results")).toContainText("Shotgun flick");
+});
+
+test("mode selector offers Quick, Standard and Deep with durations", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("#mode option")).toHaveCount(3);
+  await expect(page.locator("#mode")).toHaveValue("standard");
+  await expect(page.locator("#mode option").first()).toContainText("Quick · about");
+});

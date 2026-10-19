@@ -14,7 +14,7 @@
     <h1>Strafe<span>/</span>Lab</h1>
     <span class="eyebrow">Tracking sensitivity finder for Apex Legends · MnK</span>
   </header>
-  <p class="lede">A blind tracking test built around SMG fights. It sweeps you from fast wrist-aim sens down to slow arm-aim sens, records every mouse movement, zooms in on your best zone, and then a tracking coach explains what your aim is doing and what to fix.</p>
+  <p class="lede">A blind sensitivity test built around Apex fights. It sweeps you from fast wrist-aim sens to slow arm-aim sens across eight aim skills, records every mouse event, zooms in on your best zone, and reports a recommended range with a 95% interval. It says so when the data can't pick a winner.</p>
 
   <div class="grid2">
     <section class="panel" aria-labelledby="setup-h">
@@ -27,12 +27,13 @@
       <div class="fields">
         <label for="aspect">Game aspect<select id="aspect"></select></label>
         <label for="scaling">Scaling<select id="scaling"><option value="stretched">Stretched to fill</option><option value="blackbars">Black bars</option></select></label>
+        <label for="mode">Test length<select id="mode"></select></label>
       </div>
       <p class="calc" id="calc">Current: <b>—</b> cm/360</p>
       <ul class="checks">
         <li>Use your real mouse, mousepad and desk setup. Slow sens blocks need room to move your arm.</li>
         <li>Turn off Windows "Enhance pointer precision". The test asks the browser for raw input and tells you if it got it.</li>
-        <li>About 11 minutes: a warm-up plus 10 blind blocks. Take breaks between blocks whenever you want.</li>
+        <li>Pick Quick, Standard or Deep. Each is a short warm-up plus blind blocks. Take breaks between blocks whenever you want.</li>
         <li>Every block starts with a few unscored seconds so your hand can adjust to the new sens.</li>
         <li>Esc pauses. The block you were in restarts.</li>
       </ul>
@@ -54,14 +55,18 @@
   </div>
 
   <section aria-labelledby="dr-h" style="display:flex;flex-direction:column;gap:12px">
-    <h2 id="dr-h" style="font-size:20px">Every block runs the same four tracking drills</h2>
+    <h2 id="dr-h" style="font-size:20px">Every block runs short drills for each skill</h2>
     <div class="drills">
-      <div class="drill"><span class="spec">4 m · 10 s · 25% of score</span><h3>Point-blank</h3><p>Building and door fights. ADAD, crouch spam and jumps right in your face. Tests fast reactive tracking.</p></div>
-      <div class="drill"><span class="spec">8 m · 12 s · 30% of score</span><h3>Close SMG duel</h3><p>The classic R-99 fight: strafes, crouch spam, jump strafes and slides.</p></div>
-      <div class="drill"><span class="spec">18 m · 12 s · 20% of score</span><h3>Mid-range</h3><p>Longer strafes and sprints across your screen. Tests smooth, steady tracking without wobble.</p></div>
-      <div class="drill"><span class="spec">7 m + 10 m · up to 10 s · 25%</span><h3>2v1 fight</h3><p>Two strafing enemies with 200 HP each. You deal R-99 damage while on them. Kill one, switch, kill the other.</p></div>
+      <div class="drill"><span class="spec">4 m · tracking</span><h3>Close reactive</h3><p>ADAD, crouch spam and jumps in your face.</p></div>
+      <div class="drill"><span class="spec">18 m · tracking</span><h3>Mid sustained</h3><p>Longer strafes and sprints. Smooth, no wobble.</p></div>
+      <div class="drill"><span class="spec">7 m + 10 m · R-99 damage</span><h3>2v1 switching</h3><p>Kill one, switch, kill the other.</p></div>
+      <div class="drill"><span class="spec">6 m · tracking</span><h3>Vertical</h3><p>Jumps and crouch spam: stay on them up and down.</p></div>
+      <div class="drill"><span class="spec">6–12 m · hold 250 ms</span><h3>180 turns</h3><p>Someone behind you. Turn and get on them.</p></div>
+      <div class="drill"><span class="spec">3–6 m · hold 150 ms</span><h3>Shotgun flick</h3><p>Close target pops up: flick, correct, hold.</p></div>
+      <div class="drill"><span class="spec">10–20 m · click</span><h3>Dynamic clicking</h3><p>Moving targets, one click each. Misses count.</p></div>
+      <div class="drill"><span class="spec">40 m · tracking · minor</span><h3>Long range</h3><p>Small, slow and far. Precision.</p></div>
     </div>
-    <p class="note">Enemy movement uses Apex's real speeds: about 4.4 m/s strafing with a gun out, 2 m/s crouch-walking, 7.6 m/s sprinting. Every block replays the exact same movement, so your sensitivity is the only thing that changes.</p>
+    <p class="note">Enemy movement uses Apex movement speeds (verified): about 4.4 m/s strafing with a gun out, 2 m/s crouch-walking, 7.6 m/s sprinting. Every block uses fresh random seeds so you can't memorise patterns, and the order of sensitivities is counterbalanced so warming up or tiring out doesn't bias the result.</p>
   </section>
 
   <section class="panel" aria-labelledby="cal-h">

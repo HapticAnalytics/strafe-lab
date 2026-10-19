@@ -13,10 +13,15 @@ import { fitCurve } from "./analysis/fit";
 import { copyText, previousRec, resultsHTML } from "./ui/results";
 import { Runner } from "./ui/runner";
 import { setupCalibration } from "./ui/calibration";
+import { computeV3, type V3Result } from "./analysis/result3";
+import { resultsV3HTML } from "./ui/results3";
+import { estimatedMinutes, MODES, type Mode } from "./sim/protocol";
 
 const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector(s) as T;
 const db = makeDb();
 
+(Object.keys(MODES) as Mode[]).forEach(m => $<HTMLSelectElement>("#mode").add(new Option(`${MODES[m].label} · about ${Math.round(estimatedMinutes(m))} min`, m)));
+$<HTMLSelectElement>("#mode").value = "standard";
 ASPECT_PRESETS.forEach((p, i) => $<HTMLSelectElement>("#aspect").add(new Option(p.label, String(i))));
 function readSettings(): Settings {
   return {
@@ -47,17 +52,37 @@ const mouse = new MouseInput($<HTMLCanvasElement>("#view"));
 let scene: RangeScene | null = null;
 let runner: Runner | null = null;
 
+// Results are pure functions of the stored log; memoise per session id + block count so the list stays fast.
+const v3Memo = new Map<string, V3Result>();
+function v3Of(s: SessionLog): V3Result {
+  const key = `${s.id}:${s.blocks.length}`;
+  let r = v3Memo.get(key);
+  if (!r) { r = computeV3(s); v3Memo.set(key, r); }
+  return r;
+}
+/** One-line summary for the history list: [label, recommended sens or null] */
+function summary(s: SessionLog): string | null {
+  if (s.status !== "complete") return null;
+  if (s.protocol === "v3") {
+    const r = v3Of(s);
+    if (!r.overall || !r.rec) return null;
+    return r.overall.noClearWinner ? "no clear winner" : r.overall.single ? `${fmt(r.rec.sens, 2)} sens` : `${fmt(r.rec.sensLo, 2)}–${fmt(r.rec.sensHi, 2)} sens`;
+  }
+  const r = computeResult(s);
+  return r ? `${fmt(r.recSens, 2)} sens (classic)` : null;
+}
+
 async function refreshHistory(): Promise<SessionLog[]> {
   const all = await listSessions(db);
   const done = all.filter(s => s.status === "complete");
   const last = done[done.length - 1];
-  const r = last ? computeResult(last) : null;
-  $("#prevNote").textContent = last && r ? `Last result: ${fmt(r.recSens, 2)} sens at ${last.settings.dpi} DPI (${fmt(r.fit.peakCm, 1)} cm/360)` : "";
+  const ls = last ? summary(last) : null;
+  $("#prevNote").textContent = last && ls ? `Last result: ${ls} at ${last.settings.dpi} DPI` : "";
   $("#histList").innerHTML = all.length
     ? [...all].reverse().map(s => {
-        const res = s.status === "complete" ? computeResult(s) : null;
-        const label = `${new Date(s.startedAt).toLocaleString()} · ${s.status.replace("_", " ")} · ${s.blocks.length} blocks`;
-        return `<li style="grid-template-columns:1fr auto"><span>${label}${res ? ` · ${fmt(res.recSens, 2)} sens` : ""}</span>${res ? `<button class="btn ghost" data-open="${s.id}" type="button" style="padding:6px 12px">Open</button>` : ""}</li>`;
+        const res = summary(s);
+        const label = `${new Date(s.startedAt).toLocaleString()} · ${s.protocol === "v3" ? MODES[s.mode ?? "standard"].label : "classic"} · ${s.status.replace("_", " ")} · ${s.blocks.length} blocks`;
+        return `<li style="grid-template-columns:1fr auto"><span>${label}${res ? ` · ${res}` : ""}</span>${res ? `<button class="btn ghost" data-open="${s.id}" type="button" style="padding:6px 12px">Open</button>` : ""}</li>`;
       }).join("")
     : `<li><span class="note">No sessions yet.</span></li>`;
   document.querySelectorAll<HTMLButtonElement>("[data-open]").forEach(b => (b.onclick = () => showResults(all.find(s => s.id === b.dataset.open)!, all)));
@@ -65,11 +90,18 @@ async function refreshHistory(): Promise<SessionLog[]> {
 }
 
 function showResults(s: SessionLog, all: SessionLog[]): void {
+  const box = $("#results");
+  if (s.protocol === "v3") {
+    box.innerHTML = resultsV3HTML(s, v3Of(s));
+    $("#setup").hidden = true; box.hidden = false; scrollTo(0, 0);
+    $("#againBtn").onclick = () => { box.hidden = true; startTest(); };
+    $("#setupBtn").onclick = () => { box.hidden = true; $("#setup").hidden = false; refreshHistory(); scrollTo(0, 0); };
+    return;
+  }
   const r = computeResult(s);
   if (!r) return;
   const earlier = all.filter(x => x.status === "complete" && x.startedAt < s.startedAt);
   const prev = earlier.length ? earlier[earlier.length - 1] : null;
-  const box = $("#results");
   box.innerHTML = resultsHTML(s, r, previousRec(prev));
   $("#setup").hidden = true; box.hidden = false; scrollTo(0, 0);
   $("#againBtn").onclick = () => { box.hidden = true; startTest(); };
@@ -90,7 +122,7 @@ function startTest(): void {
       quit: () => { refreshHistory(); },
     });
   }
-  runner!.start(settings);
+  runner!.start(settings, ($<HTMLSelectElement>("#mode").value as Mode) || "standard");
 }
 $("#startBtn").addEventListener("click", startTest);
 const calibration = setupCalibration(db, readSettings);
