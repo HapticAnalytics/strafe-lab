@@ -1,0 +1,9 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Milestone 2 acceptance (simulation) > recovery rates by mode and noise are locked (any change must be deliberate) 1`] = `
+{
+  "deep": "sigma 1.5: 97%, sigma 2: 93%, sigma 3: 82%, sigma 5: 60%",
+  "quick": "sigma 1.5: 96%, sigma 2: 90%, sigma 3: 76%, sigma 5: 56%",
+  "standard": "sigma 1.5: 98%, sigma 2: 95%, sigma 3: 83%, sigma 5: 66%",
+}
+`;

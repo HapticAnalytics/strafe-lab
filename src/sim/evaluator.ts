@@ -1,6 +1,6 @@
 // The single source of truth for "what happened" in a drill: integrates raw input events and evaluates the
-// scenario on a fixed time grid. Live play and offline analysis run this same code, so live HP bars / kills and
-// stored metrics cannot disagree, and nothing depends on the render frame rate.
+// scenario on a fixed time grid. Live play and offline analysis run this same code, so live HP bars / kills /
+// spawns and stored metrics cannot disagree, and nothing depends on the render frame rate.
 import { applyDelta, type Aim } from "../core/crosshair";
 import { wrap } from "../core/math";
 import type { InputSample } from "../telemetry/schema";
@@ -14,7 +14,7 @@ export const GRID_DT = 0.001;
 export interface Sample {
   t: number; yaw: number; pitch: number;
   ty: number; tp: number; hw: number; vh: number;
-  /** 0 miss, 1 body, 2 head (any living enemy) */
+  /** 0 miss, 1 body, 2 head (any living / active enemy) */
   on: 0 | 1 | 2;
   /** index of the engaged enemy */
   target: number;
@@ -24,24 +24,44 @@ export interface Sample {
 
 export interface Kill { i: number; t: number }
 
+/** Spawn drills: one record per target that appeared. */
+export interface SpawnResult {
+  i: number;
+  /** when it appeared (s) */
+  at: number;
+  /** when it was completed (s), null if it timed out or the drill ended first */
+  done: number | null;
+  /** clicks that were not on the target while it was active */
+  misses: number;
+  /** angular distance from the crosshair to the target when it appeared (deg) */
+  startOffDeg: number;
+}
+
 export class DrillEvaluator {
   readonly aim: Aim = { yaw: 0, pitch: 0 };
   readonly samples: Sample[] = [];
   readonly kills: Kill[] = [];
+  readonly spawns: SpawnResult[] = [];
   hp: number[];
   dmgBody = 0;
   dmgHead = 0;
   counts = 0;
+  clicks = 0;
   /** next grid tick index to evaluate */
   private tick = 0;
   private events: InputSample[] = [];
   private ei = 0;
+  /** spawn state: current target, when it (will) appear, when the current hold started */
+  private si = 0;
+  private sAt = 0;
+  private holdFrom: number | null = null;
   done = false;
   endT: number;
 
   constructor(readonly sc: Scenario, readonly k: number, private keepSamples = true, tEnd = Infinity) {
     this.hp = sc.lanes.map(() => sc.damage?.hp ?? Infinity);
     this.endT = Math.min(sc.dur, tEnd);
+    if (sc.spawn) this.sAt = sc.spawn.def.delay;
   }
 
   /** Time of the next tick to be evaluated; events earlier than this arriving now are "late". */
@@ -53,7 +73,45 @@ export class DrillEvaluator {
     return late;
   }
 
-  alive(i: number): boolean { return this.hp[i] > 0; }
+  alive(i: number): boolean {
+    if (this.sc.spawn) return i === this.si && this.tick * GRID_DT >= this.sAt;
+    return this.hp[i] > 0;
+  }
+
+  /** Spawn drills: the index and local time of the target visible at time t, if any. */
+  activeSpawn(t: number): { i: number; local: number } | null {
+    if (!this.sc.spawn || t < this.sAt) return null;
+    return { i: this.si, local: t - this.sAt };
+  }
+
+  private spawnTick(t: number, clicksNow: number[]): void {
+    const sp = this.sc.spawn!;
+    if (t < this.sAt) { return; }
+    const i = this.si, local = t - this.sAt;
+    let rec = this.spawns[this.spawns.length - 1];
+    if (!rec || rec.i !== i) {
+      const tv0 = targetView(this.sc, i, 0);
+      const off = Math.hypot(wrap(tv0.yaw - this.aim.yaw), tv0.pitch - this.aim.pitch) / (Math.PI / 180);
+      rec = { i, at: this.sAt, done: null, misses: 0, startOffDeg: off };
+      this.spawns.push(rec);
+    }
+    const tv = targetView(this.sc, i, local);
+    const on = hitAt(tv, this.aim.yaw, this.aim.pitch);
+    let complete = false;
+    if (sp.def.complete === "hold") {
+      if (on) { if (this.holdFrom == null) this.holdFrom = t; if (t - this.holdFrom >= sp.def.holdMs / 1000 - 1e-9) complete = true; }
+      else this.holdFrom = null;
+    } else {
+      for (const hitKind of clicksNow) { if (hitKind) { complete = true; break; } rec.misses++; }
+    }
+    if (this.keepSamples) this.samples.push({ t, yaw: this.aim.yaw, pitch: this.aim.pitch, ty: tv.yaw, tp: tv.pitch, hw: tv.hw, vh: tv.vh, on, target: i, c: this.counts });
+    if (complete) rec.done = t;
+    if (complete || local >= sp.def.timeout - 1e-9) {
+      this.si = Math.min(sp.targets.length - 1, this.si + 1);
+      this.sAt = t + sp.def.delay;
+      this.holdFrom = null;
+    }
+  }
 
   /** Evaluate all grid ticks with t <= tMax (and <= the drill end). */
   advanceTo(tMax: number): void {
@@ -62,11 +120,20 @@ export class DrillEvaluator {
       const t = this.tick * GRID_DT;
       if (t > tMax + 1e-12) break;
       if (t > this.endT + 1e-12) { this.done = true; break; }
+      // spawn drills: for each click, whether it was on the active target at that moment
+      const clicksNow: number[] = [];
       while (this.ei < this.events.length && this.events[this.ei].t <= t + 1e-12) {
         const e = this.events[this.ei++];
+        if (e.b) {
+          this.clicks++;
+          const a = this.activeSpawn(t);
+          if (a) clicksNow.push(hitAt(targetView(sc, a.i, a.local), this.aim.yaw, this.aim.pitch));
+          continue;
+        }
         applyDelta(this.aim, e.dx, e.dy, this.k);
         this.counts += Math.hypot(e.dx, e.dy);
       }
+      if (sc.spawn) { this.spawnTick(t, clicksNow); this.tick++; continue; }
       const { yaw, pitch } = this.aim;
       let on: 0 | 1 | 2 = 0, hitI = -1, best = Infinity, target = -1;
       let tv0 = null as ReturnType<typeof targetView> | null;

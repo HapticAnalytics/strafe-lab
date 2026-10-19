@@ -48,12 +48,21 @@ export class CaptureBuffer {
   }
 }
 
+/** Log a left-button press (dx = dy = 0, b = 1) on the same clock. */
+export function ingestClick(buf: CaptureBuffer, timeStamp: number): InputSample | null {
+  if (timeStamp < buf.t0) return null;
+  const s: InputSample = { t: (timeStamp - buf.t0) / 1000, dx: 0, dy: 0, b: 1 };
+  buf.samples.push(s);
+  return s;
+}
+
 /** Polling-rate estimate (Hz) from intervals between consecutive moving samples, or null if too few. */
 export function estimatePollingHz(samples: InputSample[]): { hz: number | null; medianMs: number | null; n: number } {
   const iv: number[] = [];
   for (let i = 1; i < samples.length; i++) {
     const d = (samples[i].t - samples[i - 1].t) * 1000;
     // APPROX: only intervals under 50 ms count as continuous movement; longer gaps are pauses, not polling
+    if (samples[i].b || samples[i - 1].b) continue;
     if (d > 0 && d < 50) iv.push(d);
   }
   // APPROX: need at least 50 intervals for a stable median

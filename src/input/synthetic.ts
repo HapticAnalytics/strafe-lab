@@ -2,9 +2,10 @@
 // that deliver those counts the way a browser would (per-event, frame-batched with coalesced lists, or
 // frame-aligned without them). Drives the same CaptureBuffer -> event log -> replay -> metrics path as real play.
 import { applyDelta } from "../core/crosshair";
+import { wrap } from "../core/math";
 import { mulberry32 } from "../core/rng";
 import { DrillEvaluator } from "../sim/evaluator";
-import { targetView, type Scenario } from "../sim/scenario";
+import { hitAt, targetView, type Scenario } from "../sim/scenario";
 import type { InputSample } from "../telemetry/schema";
 import type { RawParent } from "./capture";
 
@@ -34,17 +35,31 @@ export function synthPlayerEvents(sc: Scenario, k: number, p: PlayerModel, pollH
   const aim = { yaw: 0, pitch: 0 };
   const out: InputSample[] = [];
   const gain = p.gain ?? 1;
+  let lastClick = -1;
   for (let i = 1; i / pollHz <= sc.dur; i++) {
     const t = i / pollHz;
     ev.advanceTo(t - 1 / pollHz);
-    let tgt = 0;
-    while (tgt < sc.lanes.length - 1 && !ev.alive(tgt)) tgt++;
-    const tv = targetView(sc, tgt, Math.max(0, t - p.lag));
+    let tv;
+    if (sc.spawn) {
+      // spawn drills: react `lag` s after the target appears, then home in on where it is now
+      const a = ev.activeSpawn(t);
+      if (!a || a.local < p.lag) continue;
+      tv = targetView(sc, a.i, a.local);
+      if (sc.spawn.def.complete === "click" && t - lastClick > 0.1 && hitAt(targetView(sc, a.i, a.local), aim.yaw, aim.pitch)) {
+        const c = { t, dx: 0, dy: 0, b: 1 as const };
+        out.push(c); ev.push([c]); lastClick = t;
+        continue;
+      }
+    } else {
+      let tgt = 0;
+      while (tgt < sc.lanes.length - 1 && !ev.alive(tgt)) tgt++;
+      tv = targetView(sc, tgt, Math.max(0, t - p.lag));
+    }
     let wantYaw = tv.yaw;
     if (p.tremorDeg) wantYaw += p.tremorDeg * DEGR * Math.sin(2 * Math.PI * (p.tremorHz ?? 10) * t);
     if (p.noiseDeg) wantYaw += (rng() * 2 - 1) * p.noiseDeg * DEGR;
     const wantPitch = tv.pitch + (p.pitchOffsetDeg ?? 0) * DEGR;
-    const dx = Math.round(((aim.yaw - wantYaw) * gain) / k), dy = Math.round(((aim.pitch - wantPitch) * gain) / k);
+    const dx = Math.round((wrap(aim.yaw - wantYaw) * gain) / k), dy = Math.round(((aim.pitch - wantPitch) * gain) / k);
     if (!dx && !dy) continue;
     applyDelta(aim, dx, dy, k);
     const s = { t, dx, dy };

@@ -4,7 +4,7 @@
 // Every intermediate event is recovered with getCoalescedEvents() when available and kept with its own timestamp.
 import { applyDelta, type Aim } from "../core/crosshair";
 import type { CaptureDiagnostics, InputSample, InputSource } from "../telemetry/schema";
-import { CaptureBuffer, newDiagnostics, type RawParent, type RawPointer } from "./capture";
+import { CaptureBuffer, ingestClick, newDiagnostics, type RawParent, type RawPointer } from "./capture";
 
 export function pickSource(): InputSource {
   if (typeof window === "undefined") return "synthetic";
@@ -44,6 +44,11 @@ export class MouseInput {
       for (const s of this.buf.ingest(p)) { applyDelta(this.aim, s.dx, s.dy, this.k); this.pending.push(s); }
     };
     document.addEventListener(this.source === "synthetic" ? "mousemove" : this.source, handler);
+    document.addEventListener("mousedown", e => {
+      if (!this.locked || !this.accepting || e.button !== 0) return;
+      const s = ingestClick(this.buf, e.timeStamp);
+      if (s) this.pending.push(s);
+    });
     document.addEventListener("pointerlockchange", () => {
       this.locked = document.pointerLockElement === this.canvas;
       this.onLockChange?.(this.locked);

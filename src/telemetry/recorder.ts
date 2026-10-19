@@ -17,7 +17,7 @@ export class BlockRecorder {
   /** Stores copies with -0 normalised to 0 (JSON cannot represent -0, and exports must round-trip exactly). */
   events(samples: InputSample[]): void {
     if (!this.cur) return;
-    for (const s of samples) this.cur.events.push({ t: s.t + 0, dx: s.dx + 0, dy: s.dy + 0 });
+    for (const s of samples) this.cur.events.push(s.b ? { t: s.t + 0, dx: 0, dy: 0, b: 1 } : { t: s.t + 0, dx: s.dx + 0, dy: s.dy + 0 });
   }
 
   /** The warm-up adjustment drill ("acc") is not stored. */
