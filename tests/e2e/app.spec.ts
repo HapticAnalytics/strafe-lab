@@ -134,3 +134,20 @@ test("replay: flagged moments are one click away and the replay renders", async 
   await page.screenshot({ path: info.outputPath("replay.png"), fullPage: true });
   expect(errors).toEqual([]);
 });
+
+test("dashboard renders sens history and explains the fingerprint is not ready", async ({ page }, info) => {
+  const { synthSessionV3 } = await import("../helpers");
+  const file = info.outputPath("dash.json");
+  const ext = [{ id: "x1", at: "2026-01-01T10:00:00.000Z", kind: "firing-range", measure: "R-99 60 s strafe damage", value: 3000, unit: "dmg", higherIsBetter: true, notes: "" }];
+  (await import("node:fs")).writeFileSync(file, JSON.stringify({ format: "strafe-lab-export", schema: 2, exportedAt: "2026-01-01T00:00:00.000Z", sessions: [synthSessionV3("d3")], external: ext }));
+  const errors: string[] = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto("/");
+  await page.setInputFiles("#importFile", file);
+  await page.click("#dashOpen");
+  await expect(page.locator("#dashboard")).toContainText("Sensitivity history");
+  await expect(page.locator("#dashboard")).toContainText("needs a noise floor first");
+  await expect(page.locator("#dashboard")).toContainText("R-99 60 s strafe damage");
+  await page.screenshot({ path: info.outputPath("dashboard.png"), fullPage: true });
+  expect(errors).toEqual([]);
+});

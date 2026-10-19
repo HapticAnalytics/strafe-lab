@@ -15,6 +15,9 @@ import { Runner } from "./ui/runner";
 import { setupCalibration } from "./ui/calibration";
 import { setupBaseline } from "./ui/baseline";
 import { setupReplay } from "./ui/replay";
+import { buildDashboard } from "./analysis/dashboard";
+import { renderDashboard } from "./ui/dashboard";
+import { listExternal } from "./storage/db";
 import { batteryMetrics } from "./analysis/battery";
 import { computeV3, type V3Result } from "./analysis/result3";
 import { resultsV3HTML } from "./ui/results3";
@@ -150,6 +153,21 @@ $("#startBtn").addEventListener("click", startTest);
 const calibration = setupCalibration(db, readSettings);
 $("#calOpen").addEventListener("click", () => calibration.open());
 
+async function exportJson(): Promise<void> {
+  const data = await exportAll(db);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
+  a.download = `strafe-lab-${data.exportedAt.slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+$("#dashOpen").addEventListener("click", async () => {
+  document.querySelectorAll<HTMLElement>(".wrap").forEach(w => (w.hidden = true));
+  $("#dashboard").hidden = false; scrollTo(0, 0);
+  const d = buildDashboard(await listSessions(db), await listExternal(db));
+  renderDashboard($("#dashRoot"), d, readSettings().dpi, () => { exportJson(); });
+});
+$("#dashBack").addEventListener("click", () => { $("#dashboard").hidden = true; $("#setup").hidden = false; });
 $("#exportBtn").addEventListener("click", async () => {
   const data = await exportAll(db);
   const a = document.createElement("a");

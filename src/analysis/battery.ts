@@ -52,6 +52,14 @@ export function batteryMetrics(s: SessionLog): MetricPoint[] {
       if (t.length) out.push({ key: `spawn:${id}:ms`, label: `${SKILL_NAMES[id]} · median time`, unit: "ms", higherIsBetter: false, value: mean(t) });
     }
   }
+  // Within-person contrasts for the Aim Fingerprint (Milestone 5), averaged over horizontal tracking skills.
+  // Each is 0 for a perfectly balanced player, so no population norm is needed.
+  const horiz = (["pb", "mid", "long"] as SkillId[]).flatMap(id => per.get(id) ?? []).map(r => r.m1).filter((m): m is M1Metrics => !!m);
+  const avg = (f: (m: M1Metrics) => number | null) => { const v = horiz.map(f).filter((x): x is number => x != null && isFinite(x)); return v.length ? mean(v) : null; };
+  const asym = avg(m => m.asymmetryPct), trail = avg(m => (m.trailingPct + m.leadingPct > 0 ? m.trailingPct - 50 : null)), vh = avg(m => m.errVNorm - m.errHNorm);
+  if (asym != null) out.push({ key: "contrast:asym", label: "Left − right time on target", unit: "pts", higherIsBetter: false, value: asym });
+  if (trail != null) out.push({ key: "contrast:trail", label: "Trailing − 50% of misses", unit: "pts", higherIsBetter: false, value: trail });
+  if (vh != null) out.push({ key: "contrast:vh", label: "Vertical − horizontal error", unit: "× size", higherIsBetter: false, value: vh });
   out.unshift({ key: "battery:combined", label: "Battery combined score", unit: "pts", higherIsBetter: true, value: combinedScore(scores) });
   cache.set(s, out);
   return out;

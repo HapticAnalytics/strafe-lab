@@ -69,6 +69,11 @@
     <p class="note">Enemy movement uses Apex movement speeds (verified): about 4.4 m/s strafing with a gun out, 2 m/s crouch-walking, 7.6 m/s sprinting. Every block uses fresh random seeds so you can't memorise patterns, and the order of sensitivities is counterbalanced so warming up or tiring out doesn't bias the result.</p>
   </section>
 
+  <section class="panel" aria-labelledby="dash-h">
+    <div class="row" style="justify-content:space-between"><h2 id="dash-h" style="font-size:20px">Dashboard</h2><button class="btn" id="dashOpen" type="button">Open dashboard</button></div>
+    <p class="note">Your Aim Fingerprint, sensitivity history, skill trends and records. Every number links back to the session it came from.</p>
+  </section>
+
   <section class="panel" aria-labelledby="base-h">
     <div class="row" style="justify-content:space-between"><h2 id="base-h" style="font-size:20px">Baseline and noise floor</h2><button class="btn ghost" id="baseOpen" type="button">Open baseline</button></div>
     <p class="note">Before training, run the 2.5-minute baseline battery on 3 separate days and log your Firing Range and aim-trainer benchmarks. That measures how much your numbers move day to day, which is the bar any later improvement has to clear.</p>
@@ -172,6 +177,12 @@
     </section>
   </div>
   <div class="row"><button class="btn ghost" id="baseBack" type="button">Back to setup</button></div>
+</div>
+
+<div class="wrap" id="dashboard" hidden>
+  <header class="brand"><h1>Strafe<span>/</span>Lab</h1><span class="eyebrow">Dashboard</span></header>
+  <div id="dashRoot" style="display:flex;flex-direction:column;gap:20px"></div>
+  <div class="row"><button class="btn ghost" id="dashBack" type="button">Back to setup</button></div>
 </div>
 
 <div class="wrap" id="replay" hidden>
