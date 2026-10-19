@@ -111,7 +111,7 @@ export interface SessionLog {
 
 // ---------- calibration ----------
 
-export type CalibrationKind = "dpi" | "turn360" | "polling";
+export type CalibrationKind = "dpi" | "turn360" | "polling" | "ads360";
 export interface CalibrationRecord {
   id: string;
   at: string;

@@ -3,6 +3,8 @@
 import { measuredDpi, netCounts, repeatStats, timingReport, turn360, CAL_TOLERANCE_PCT } from "../analysis/calibration";
 import { fmt } from "../core/math";
 import { MouseInput } from "../input/pointer";
+import { effectiveYaw, OPTIC_FOV_SCALE_APPROX, OPTICS, SCALAR_INDEX, scalarFor, targetRatio, zoomFactor, type MatchMethod, type Optic } from "../core/ads";
+import { countsPer360, hfov43FromScale, hfovForAspect } from "../core/units";
 import { listCalibrations, saveCalibration, type LabDB } from "../storage/db";
 import type { CalibrationKind, CalibrationRecord, Settings } from "../telemetry/schema";
 
@@ -22,7 +24,7 @@ export function setupCalibration(db: LabDB, readSettings: () => Settings): { ope
   function begin(k: CalibrationKind): void {
     kind = k;
     pad.hidden = false;
-    $("#padEyebrow").textContent = { dpi: "Ruler DPI test", turn360: "Physical 360° test", polling: "Input timing test" }[k];
+    $("#padEyebrow").textContent = { dpi: "Ruler DPI test", turn360: "Physical 360° test", polling: "Input timing test", ads360: `ADS 360° test · ${$<HTMLSelectElement>("#adsOptic").value}` }[k];
     show("Click here to lock the mouse", k === "polling" ? "Then move in steady circles. It stops by itself after 5 seconds." : "Then make the move and press Space or click to finish.");
     $("#padLive").textContent = "";
   }
@@ -70,6 +72,12 @@ export function setupCalibration(db: LabDB, readSettings: () => Settings): { ope
     } else if (k === "turn360") {
       const r = turn360(counts, s.sens);
       rec.input = { sens: s.sens, dpi: s.dpi }; rec.result = { counts, expectedCounts: r.expected, errorPct: r.errorPct, apexDegrees: r.apexDegrees };
+    } else if (k === "ads360") {
+      const optic = $<HTMLSelectElement>("#adsOptic").value as Optic;
+      const adsMult = +$<HTMLInputElement>("#adsMult").value || 1, scalar = +$<HTMLInputElement>("#adsScalar").value || 1;
+      const z = zoomFactor(effectiveYaw(counts), s.sens, adsMult, scalar);
+      rec.input = { optic, sens: s.sens, adsMult, scalar };
+      rec.result = { counts, hipCounts: countsPer360(s.sens), zoomFactor: z };
     } else {
       const d = frameTimes.slice(1).map((t, i) => t - frameTimes[i]).sort((a, b) => a - b);
       const frameMs = d.length ? d[d.length >> 1] : null;
@@ -91,8 +99,32 @@ export function setupCalibration(db: LabDB, readSettings: () => Settings): { ope
     $("#cal360Out").innerHTML = ts ? `Last ${ts.n}: mean error <b>${fmt(ts.mean, 2)}%</b> (range ${fmt(ts.min, 2)} to ${fmt(ts.max, 2)}%). ${Math.abs(ts.mean) < CAL_TOLERANCE_PCT ? "Within 1%: input matches Apex." : "Outside 1%: check DPI, sens and Enhance pointer precision, then repeat."}` : "";
     const lp = poll[poll.length - 1];
     $("#calPollOut").innerHTML = lp ? `<b>${lp.result.pollingHz != null ? fmt(lp.result.pollingHz as number, 0) + " Hz" : "—"}</b> · source ${lp.input.browserSource} · frame-aligned ${fmt(lp.result.frameAlignedPct as number, 0)}% · raw input ${lp.result.rawInput}<br>${lp.result.verdict}` : "";
+    renderAds(of("ads360"));
     $("#calList").innerHTML = all.length ? [...all].reverse().slice(0, 12).map(c => `<li style="grid-template-columns:1fr"><span>${new Date(c.at).toLocaleString()} · ${c.kind} · ${Object.entries(c.result).filter(([k]) => k !== "verdict").map(([k, v]) => `${k} ${typeof v === "number" ? fmt(v, 2) : v}`).join(" · ")}</span></li>`).join("") : `<li><span class="note">No calibrations yet.</span></li>`;
   }
+
+  /** Latest measurement per optic -> recommended scalar for the chosen method. All maths in core/ads.ts. */
+  function renderAds(list: CalibrationRecord[]): void {
+    const s = readSettings();
+    const mv = $<HTMLSelectElement>("#adsMethod").value;
+    const method: MatchMethod = mv === "360" ? { kind: "360" } : { kind: "mdm", p: mv === "mdm75" ? 0.75 : 0 };
+    const adsMult = +$<HTMLInputElement>("#adsMult").value || 1;
+    const hip = hfovForAspect(hfov43FromScale(s.fovScale), s.display.aspect ?? 16 / 9);
+    const rows = OPTICS.map(o => {
+      const last = [...list].reverse().find(c => c.input.optic === o);
+      if (!last) return `<tr><td>${o}</td><td colspan="3">not measured</td></tr>`;
+      const z = last.result.zoomFactor as number;
+      // APPROX: optic FOV = hipfire FOV x community scale factor (only matters for monitor-distance methods)
+      const ratio = targetRatio(method, hip, hip * OPTIC_FOV_SCALE_APPROX[o]);
+      const sc = scalarFor(ratio, adsMult, z);
+      return `<tr><td>${o}</td><td>${fmt(z, 3)}</td><td>${fmt(sc, 3)}</td><td>mouse_zoomed_sensitivity_scalar_${SCALAR_INDEX[o]} "${sc.toFixed(6)}"</td></tr>`;
+    }).join("");
+    const any = OPTICS.some(o => list.some(c => c.input.optic === o));
+    $("#calAdsOut").innerHTML = any ? `<div class="tablebox"><table style="min-width:520px"><thead><tr><th>Optic</th><th>Measured zoom factor</th><th>Scalar to set</th><th>settings.cfg line</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="note">Also set mouse_use_per_scope_sensitivity_scalars "1". Zoom factors are measured (verified for your game version). The scalar index for each optic is a community mapping, not verified: change one value, check that optic in the Firing Range, then the rest.${method.kind === "mdm" ? " Monitor-distance methods use approximate optic FOVs from community data." : ""}</p>` : "";
+  }
+  ["#adsMethod", "#adsMult"].forEach(id => $(id).addEventListener("input", () => render()));
+  OPTICS.forEach(o => $<HTMLSelectElement>("#adsOptic").add(new Option(o, o)));
 
   document.querySelectorAll<HTMLButtonElement>("[data-cal]").forEach(b => b.addEventListener("click", () => begin(b.dataset.cal as CalibrationKind)));
   $("#calBack").addEventListener("click", () => { $("#calib").hidden = true; $("#setup").hidden = false; });

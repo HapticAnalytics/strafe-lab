@@ -113,6 +113,18 @@
       <div class="calc" id="calPollOut"></div>
     </section>
     <section class="panel">
+      <h2 style="font-size:18px">4 · ADS per optic</h2>
+      <p class="note">Apex's per-optic zoom scaling isn't published, so measure it. In the Firing Range, ADS with one optic and mark a pad distance that turns exactly 360°. Here, pick that optic, start, make the same swipe, and press Space or click.</p>
+      <div class="fields">
+        <label for="adsOptic">Optic<select id="adsOptic"></select></label>
+        <label for="adsMult">ADS multiplier<input id="adsMult" type="number" min="0.1" max="5" step="0.01" value="1"></label>
+        <label for="adsScalar">This optic's scalar<input id="adsScalar" type="number" min="0.1" max="5" step="0.01" value="1"></label>
+      </div>
+      <div class="fields"><label for="adsMethod">Match method<select id="adsMethod"><option value="360">Same cm/360 as hipfire</option><option value="mdm0">Monitor distance 0%</option><option value="mdm75">Monitor distance 75%</option></select></label></div>
+      <div class="row"><button class="btn" data-cal="ads360" type="button">Start ADS 360° test</button></div>
+      <div class="calc" id="calAdsOut"></div>
+    </section>
+    <section class="panel">
       <h2 style="font-size:18px">Saved calibrations</h2>
       <ul class="insights" id="calList"></ul>
     </section>

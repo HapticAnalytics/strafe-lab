@@ -71,6 +71,7 @@ test("calibration screen opens and lists no calibrations initially", async ({ pa
   await page.click("#calOpen");
   await expect(page.locator("#calib")).toBeVisible();
   await expect(page.locator("#calList")).toContainText("No calibrations yet.");
+  await expect(page.locator("#adsOptic option")).toHaveCount(7);
   await page.click("#calBack");
   await expect(page.locator("#setup")).toBeVisible();
 });
