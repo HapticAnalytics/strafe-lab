@@ -1,6 +1,6 @@
 // Rendering reads sim state and never changes it. No hit testing happens here (see sim/hit.ts).
 import * as THREE from "three";
-import { mulberry32 } from "../core/rng";
+import { propLayout } from "./props";
 import { layoutFor, type Display } from "../core/display";
 import { hfov43FromScale, vfovFrom43 } from "../core/units";
 import { BODY_RADIUS, EYE } from "../sim/constants";
@@ -27,7 +27,8 @@ export class RangeScene {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     const bg = 0x1d232c;
     this.scene.background = new THREE.Color(bg);
-    this.scene.fog = new THREE.Fog(bg, 45, 130);
+    // fog starts past the furthest target and ends past the scenery ring
+    this.scene.fog = new THREE.Fog(bg, 60, 170);
     this.camera.rotation.order = "YXZ";
     this.camera.position.set(0, EYE, 0);
     this.scene.add(new THREE.HemisphereLight(0xdfe8f2, 0x2a2420, 0.9));
@@ -40,12 +41,12 @@ export class RangeScene {
     const grid = new THREE.GridHelper(400, 200, 0x46505e, 0x353d48);
     grid.position.y = 0.01;
     this.scene.add(grid);
-    const r = mulberry32(99), boxMat = new THREE.MeshLambertMaterial({ color: 0x48525f });
-    for (let i = 0; i < 38; i++) {
-      const a = r() * Math.PI * 2, d = 28 + r() * 40, w = 2 + r() * 6, h = 1.5 + r() * 7;
-      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 2 + r() * 5), boxMat);
-      b.position.set(Math.sin(a) * d, h / 2, Math.cos(a) * d);
-      b.rotation.y = r() * 3;
+    // scenery sits beyond every target lane (see render/props.ts), so it can never hide a target
+    const boxMat = new THREE.MeshLambertMaterial({ color: 0x48525f });
+    for (const pr of propLayout()) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(pr.w, pr.h, pr.d), boxMat);
+      b.position.set(pr.x, pr.h / 2, pr.z);
+      b.rotation.y = pr.rot;
       this.scene.add(b);
     }
     this.enemies = [this.makeEnemy(0xff7a3d), this.makeEnemy(0xff9a4d)];
