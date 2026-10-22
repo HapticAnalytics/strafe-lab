@@ -22,14 +22,15 @@ export interface ModeDef {
 
 const ALL: SkillId[] = ["pb", "mid", "duo", "vert", "turn", "click", "flick", "long"];
 
-// HYPOTHESIS: block counts and segment lengths chosen to hit the target durations (Quick 3-4, Standard 6-8, Deep 12-15
-// min). Whether they give a stable estimate is tested by simulation (tests/sensfinder.test.ts) and then by real
-// test-retest; ROADMAP says the durations are re-set from measured reliability.
+// HYPOTHESIS: drills are 10 s (Deep 12 s) after player feedback (2026-10-22) that 4-6 s drills were too short to play
+// properly. Sessions: Quick ~6.5, Standard ~15, Deep ~24 min (the original 3-4 / 6-8 / 12-15 min targets were dropped).
+// Block counts are unchanged; recovery accuracy is checked by simulation (tests/sensfinder.test.ts) and then by real
+// test-retest, and ROADMAP says the durations are re-set from measured reliability.
 export const MODES: Record<Mode, ModeDef> = {
 // Zoom width 0.8/1.25 beat 0.9/1.1 in simulation (80% vs 63% within ±8% at sigma 3; see tests/sensfinder.test.ts).
-  quick: { label: "Quick", skills: ["pb", "mid", "duo", "flick"], segDur: 5, accDur: 4, sweepN: 5, zoom: [0.8, 1, 1.25], zoomReps: 1 },
-  standard: { label: "Standard", skills: ALL, segDur: 4, accDur: 4, sweepN: 6, zoom: [0.8, 1.25], zoomReps: 2 },
-  deep: { label: "Deep", skills: ALL, segDur: 6, accDur: 5, sweepN: 7, zoom: [0.8, 1, 1.25], zoomReps: 2 },
+  quick: { label: "Quick", skills: ["pb", "mid", "duo", "flick"], segDur: 10, accDur: 4, sweepN: 5, zoom: [0.8, 1, 1.25], zoomReps: 1 },
+  standard: { label: "Standard", skills: ALL, segDur: 10, accDur: 4, sweepN: 6, zoom: [0.8, 1.25], zoomReps: 2 },
+  deep: { label: "Deep", skills: ALL, segDur: 12, accDur: 5, sweepN: 7, zoom: [0.8, 1, 1.25], zoomReps: 2 },
 };
 
 // HYPOTHESIS: the best sens lies within a factor of 2 either side of the current sens. If the peak lands at the

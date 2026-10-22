@@ -8,10 +8,10 @@ const SKILL_ORDER: SkillId[] = ["pb", "mid", "duo", "vert", "turn", "click", "fl
 // HYPOTHESIS: 4 fixed seed sets, rotated by battery number, limit memorisation while keeping scenarios comparable.
 // Different sets differ slightly in difficulty; that variation is included in (inflates) the noise floor.
 export const SEED_SETS = 4;
-// HYPOTHESIS: 2 rounds x 8 skills x 6 s (+5 s acclimation) is long enough for stable per-skill scores and short
-// enough (~2.5 min) to run daily. Test: the noise floor itself (Milestone 3) tells us.
+// HYPOTHESIS: 2 rounds x 8 skills x 10 s (+5 s acclimation) is long enough for stable per-skill scores and short
+// enough (~3.5 min) to run daily (6 s drills were too short, player feedback 2026-10-22). Test: the noise floor itself.
 export const BATTERY_ROUNDS = 2;
-export const BATTERY_SEG = 6;
+export const BATTERY_SEG = 10;
 export const BATTERY_ACC = 5;
 // APPROX: base value for fixed battery seeds; far from anything a random 32-bit training seed would hit by chance
 const BASE_SEED = 7_000_000;

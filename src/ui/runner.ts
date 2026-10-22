@@ -26,7 +26,7 @@ const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySele
 // are applied before their tick is evaluated. Only affects when HP bars/kills/spawns update, never stored metrics.
 const LIVE_LAG = 0.05;
 // warm-up segments are capped so the unscored block stays short
-const WARM_SEG_MAX = 4;
+const WARM_SEG_MAX = 6;
 
 interface PlanBlock extends PlannedBlock { warm: boolean }
 interface BlockState {

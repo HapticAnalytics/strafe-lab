@@ -44,10 +44,10 @@ describe("protocol", () => {
     expect(z.length).toBe(4);
     expect(z[0]).toBe(z[3]); expect(z[1]).toBe(z[2]);
   });
-  it("mode durations hit the ROADMAP targets", () => {
-    expect(estimatedMinutes("quick")).toBeGreaterThanOrEqual(3); expect(estimatedMinutes("quick")).toBeLessThanOrEqual(4);
-    expect(estimatedMinutes("standard")).toBeGreaterThanOrEqual(6); expect(estimatedMinutes("standard")).toBeLessThanOrEqual(8);
-    expect(estimatedMinutes("deep")).toBeGreaterThanOrEqual(12); expect(estimatedMinutes("deep")).toBeLessThanOrEqual(15);
+  it("mode durations match the revised targets (10 s drills; Deep 12 s)", () => {
+    expect(estimatedMinutes("quick")).toBeGreaterThanOrEqual(6); expect(estimatedMinutes("quick")).toBeLessThanOrEqual(7);
+    expect(estimatedMinutes("standard")).toBeGreaterThanOrEqual(14); expect(estimatedMinutes("standard")).toBeLessThanOrEqual(16);
+    expect(estimatedMinutes("deep")).toBeGreaterThanOrEqual(22); expect(estimatedMinutes("deep")).toBeLessThanOrEqual(25);
   });
 });
 
