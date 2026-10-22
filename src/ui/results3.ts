@@ -22,7 +22,8 @@ export function resultsV3HTML(s: SessionLog, r: V3Result): string {
     hero = `<div><span class="eyebrow">Recommended range at ${dpi} DPI</span><div class="bignum" style="font-size:56px">${fmt(rec.sensLo, 2)}–${fmt(rec.sensHi, 2)}</div></div>`;
     verdict = `Best estimate ${fmt(rec.sens, 2)} (${fmt(e.peakCm, 1)} cm/360), but the 95% interval is too wide to pick one value. Any sens in the range is as good as the data can tell. Re-test on another day; if both runs overlap, pick from the overlap.`;
   }
-  const edge = e.edge ? `<p class="warnbox">Your best score was at the ${e.edge} edge of what was tested. Set your sens near this result and run again; the sweep re-centres on your current sens.</p>` : "";
+  // with no clear winner the edge point is just where a flat curve tipped, so it is not advice to move
+  const edge = e.edge && !e.noClearWinner ? `<p class="warnbox">Your best score was at the ${e.edge} edge of what was tested. Set your sens near this result and run again; the sweep re-centres on your current sens.</p>` : "";
   const learn = e.learnStart != null ? `Play-order effect: ${fmt(e.learnStart, 1)} points per block at the start, ${fmt(e.learnEnd, 1)} at the end (positive = still improving, negative = tiring). The fit separates this from sensitivity because the order was counterbalanced.` : "";
   const ids = SKILLS.filter(id => r.perSkill[id] !== undefined);
   const skillRows = ids.map(id => {

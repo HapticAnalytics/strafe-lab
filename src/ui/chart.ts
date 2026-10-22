@@ -25,6 +25,6 @@ export function chartSVG(fit: Pick<Fit, "pts" | "f" | "peakCm" | "lo" | "hi" | "
   }
   if (currentCm) s += `<line x1="${X(currentCm)}" x2="${X(currentCm)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--muted)" stroke-dasharray="4 4"/><text x="${X(currentCm) + 5}" y="${m.t + 12}" font-size="11" fill="var(--muted)">current</text>`;
   for (const p of pts) s += `<circle cx="${X(p.cm)}" cy="${Y(p.y)}" r="5" fill="var(--panel)" stroke="${p.r2 ? "var(--signal)" : "var(--ink)"}" stroke-width="2"/>`;
-  s += `<line x1="${X(peakCm)}" x2="${X(peakCm)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--signal)" stroke-width="2"/><text x="${X(peakCm) + 6}" y="${H - m.b - 8}" font-size="12" fill="var(--signal)">${opts.peakLabel || "best"}</text>`;
+  s += `<line x1="${X(peakCm)}" x2="${X(peakCm)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--signal)" stroke-width="2"/><text x="${X(peakCm) > W - 110 ? X(peakCm) - 6 : X(peakCm) + 6}" text-anchor="${X(peakCm) > W - 110 ? "end" : "start"}" y="${H - m.b - 8}" font-size="12" fill="var(--signal)">${opts.peakLabel || "best"}</text>`;
   return s + "</svg>";
 }
