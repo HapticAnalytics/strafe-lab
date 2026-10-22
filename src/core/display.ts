@@ -14,7 +14,7 @@ export const DEFAULT_DISPLAY: Display = { aspect: null, scaling: "stretched" };
 
 export const ASPECT_PRESETS: { label: string; aspect: number | null }[] = [
   { label: "Native (monitor)", aspect: null },
-  { label: "4:3 (1440x1080, 1280x960, 1024x768)", aspect: 4 / 3 },
+  { label: "4:3 (1920x1440, 1600x1200, 1440x1080, 1280x960, 1024x768)", aspect: 4 / 3 },
   { label: "5:4 (1280x1024)", aspect: 5 / 4 },
   { label: "16:10 (1920x1200)", aspect: 16 / 10 },
   { label: "16:9 (1920x1080)", aspect: 16 / 9 },
